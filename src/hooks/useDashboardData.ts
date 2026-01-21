@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { User, Project, Transaction, DashboardData } from '../types';
-import { useAuthStore } from '../store/useAuthStore';
+import { User, Project, Transaction, DashboardData, UserStats, ProjectStats } from '../types';
 
 export const useDashboardData = (): DashboardData & { loading: boolean } => {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     // Suscribirse a usuarios
@@ -55,34 +53,68 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     };
   }, []);
 
-  // Calcular balance global (Total Aportes - Total Gastos)
+  // Calcular total de aportes
   const totalContributions = transactions
     .filter((t) => t.type === 'contribution')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  // Calcular total de gastos
   const totalExpenses = transactions
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const globalBalance = totalContributions - totalExpenses;
+  // Total en caja = Aportes - Gastos
+  const totalInBox = totalContributions - totalExpenses;
 
-  // Calcular balance del usuario actual
-  // (Lo que ha aportado - (Total Gastado / 4))
-  const userContributions = currentUser
-    ? transactions
-        .filter((t) => t.type === 'contribution' && t.userId === currentUser.id)
-        .reduce((sum, t) => sum + t.amount, 0)
-    : 0;
+  // Calcular estadísticas por usuario
+  const userStats: UserStats[] = users.map((user) => {
+    const userContributions = transactions
+      .filter((t) => t.type === 'contribution' && t.userId === user.id)
+      .reduce((sum, t) => sum + t.amount, 0);
 
-  const userShare = totalExpenses / 4; // Asumiendo 4 hermanos
-  const userBalance = userContributions - userShare;
+    const userExpenses = transactions
+      .filter((t) => t.type === 'expense' && t.userId === user.id)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Cada hermano debe pagar 1/4 del total de gastos
+    const share = totalExpenses / 4;
+
+    // Balance = Lo que ha aportado - Su parte proporcional
+    const balance = userContributions - share;
+
+    return {
+      userId: user.id,
+      userName: user.name,
+      totalContributed: userContributions,
+      totalExpenses: userExpenses,
+      share,
+      balance,
+    };
+  });
+
+  // Calcular estadísticas por proyecto
+  const projectStats: ProjectStats[] = projects.map((project) => {
+    const projectTransactions = transactions.filter(
+      (t) => t.type === 'expense' && t.projectId === project.id
+    );
+
+    const totalSpent = projectTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      totalSpent,
+      transactionCount: projectTransactions.length,
+    };
+  });
 
   return {
     users,
     projects,
     transactions,
-    globalBalance,
-    userBalance,
+    totalInBox,
+    userStats,
+    projectStats,
     loading,
   };
 };

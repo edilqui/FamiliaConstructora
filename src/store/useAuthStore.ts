@@ -43,7 +43,6 @@ export const useAuthStore = create<AuthState>((set) => ({
             id: firebaseUser.uid,
             name: firebaseUser.displayName || 'Usuario',
             email: firebaseUser.email || '',
-            totalContributed: 0,
           };
           await setDoc(userRef, newUser);
           set({

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import Layout from './components/Layout';
 import Dashboard from './features/Dashboard';
+import Statistics from './features/Statistics';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
 
@@ -49,6 +50,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/statistics"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Statistics />
               </Layout>
             </ProtectedRoute>
           }

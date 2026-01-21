@@ -4,12 +4,12 @@ import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
 // Configuración de Firebase - Reemplazar con tus credenciales
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAVVsZYhJ8Yrsa-U9yFkgocJL-obUFIqaU",
+  authDomain: "familiabuilder-df93a.firebaseapp.com",
+  projectId: "familiabuilder-df93a",
+  storageBucket: "familiabuilder-df93a.firebasestorage.app",
+  messagingSenderId: "280802039541",
+  appId: "1:280802039541:web:c4ed0ce308a5811f8497bc"
 };
 
 // Inicializar Firebase

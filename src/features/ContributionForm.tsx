@@ -1,19 +1,19 @@
 import { useState, FormEvent } from 'react';
-import { X, Loader2, Receipt } from 'lucide-react';
+import { X, Loader2, DollarSign } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction } from '../services/transactionService';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn } from '../lib/utils';
 
-interface TransactionFormProps {
+interface ContributionFormProps {
   onClose: () => void;
 }
 
-export default function TransactionForm({ onClose }: TransactionFormProps) {
-  const { projects, totalInBox } = useDashboardData();
-  const user = useAuthStore((state) => state.user);
+export default function ContributionForm({ onClose }: ContributionFormProps) {
+  const { users } = useDashboardData();
+  const currentUser = useAuthStore((state) => state.user);
 
-  const [projectId, setProjectId] = useState<string>('');
+  const [userId, setUserId] = useState(currentUser?.id || '');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,46 +23,37 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
     e.preventDefault();
     setError('');
 
-    if (!user) {
+    if (!currentUser) {
       setError('Debes iniciar sesión');
       return;
     }
 
-    if (!projectId) {
-      setError('Selecciona un proyecto');
+    if (!userId) {
+      setError('Selecciona quién hace el aporte');
       return;
     }
 
-    const amountValue = parseFloat(amount);
-    if (!amount || amountValue <= 0) {
+    if (!amount || parseFloat(amount) <= 0) {
       setError('Ingresa un monto válido');
-      return;
-    }
-
-    // Validar que hay suficiente dinero en caja
-    if (amountValue > totalInBox) {
-      setError(`No hay suficiente dinero en caja. Disponible: ${formatCurrency(totalInBox)}`);
       return;
     }
 
     setLoading(true);
 
     try {
-      const selectedProject = projects.find(p => p.id === projectId);
-
       await addTransaction({
-        amount: amountValue,
-        category: selectedProject?.name || 'Gasto',
-        type: 'expense',
-        projectId: projectId,
-        userId: user.id,
-        registeredBy: user.id,
-        description: description || `Gasto en ${selectedProject?.name}`,
+        amount: parseFloat(amount),
+        category: 'Aporte',
+        type: 'contribution',
+        projectId: null,
+        userId: userId,
+        registeredBy: currentUser.id,
+        description: description || `Aporte de ${users.find(u => u.id === userId)?.name || 'usuario'}`,
       });
 
       onClose();
     } catch (err) {
-      console.error('Error al crear gasto:', err);
+      console.error('Error al registrar aporte:', err);
       setError('Error al guardar. Intenta nuevamente.');
     } finally {
       setLoading(false);
@@ -73,12 +64,12 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b bg-red-50">
+        <div className="flex items-center justify-between p-5 border-b bg-green-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500 rounded-full">
-              <Receipt className="w-5 h-5 text-white" />
+            <div className="p-2 bg-green-500 rounded-full">
+              <DollarSign className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">Registrar Gasto</h2>
+            <h2 className="text-xl font-bold text-gray-800">Registrar Aporte</h2>
           </div>
           <button
             onClick={onClose}
@@ -98,41 +89,34 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
             </div>
           )}
 
-          {/* Saldo disponible */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>Disponible en caja:</strong> {formatCurrency(totalInBox)}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Este gasto se restará del total en caja
-            </p>
-          </div>
-
-          {/* Proyecto */}
+          {/* Usuario que aporta */}
           <div>
-            <label htmlFor="project" className="block text-sm font-medium text-gray-700 mb-2">
-              Proyecto
+            <label htmlFor="user" className="block text-sm font-medium text-gray-700 mb-2">
+              ¿Quién hace el aporte?
             </label>
             <select
-              id="project"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              id="user"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               required
             >
-              <option value="">Seleccionar proyecto...</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
+              <option value="">Seleccionar...</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} {user.id === currentUser?.id ? '(Yo)' : ''}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Puedes registrar un aporte de otro hermano
+            </p>
           </div>
 
           {/* Monto */}
           <div>
             <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Monto del Gasto
+              Monto del Aporte
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400">$</span>
@@ -143,7 +127,7 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-10 pr-4 py-4 text-2xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-4 text-2xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 required
               />
             </div>
@@ -152,17 +136,23 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
           {/* Descripción */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Descripción del Gasto
+              Descripción (Opcional)
             </label>
             <textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Compra de cerámica, Pago de mano de obra..."
+              placeholder="Detalles del aporte..."
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
+          </div>
+
+          {/* Información */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-800">
+              <strong>Nota:</strong> Este aporte se sumará al total en caja y será distribuido equitativamente entre los 4 hermanos.
+            </p>
           </div>
 
           {/* Botones */}
@@ -179,7 +169,7 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
               type="submit"
               disabled={loading}
               className={cn(
-                'flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2',
+                'flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2',
                 loading && 'opacity-50 cursor-not-allowed'
               )}
             >
@@ -189,7 +179,7 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
                   Guardando...
                 </>
               ) : (
-                'Registrar Gasto'
+                'Registrar Aporte'
               )}
             </button>
           </div>
