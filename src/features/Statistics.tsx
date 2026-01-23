@@ -223,7 +223,7 @@ export default function Statistics() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-900">{transaction.description}</div>
-                    <div className="text-sm text-gray-500">{transaction.category}</div>
+                    <div className="text-sm text-gray-500">{transaction.project}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div

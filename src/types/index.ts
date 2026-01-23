@@ -16,7 +16,7 @@ export type TransactionType = 'expense' | 'contribution';
 export interface Transaction {
   id: string;
   amount: number;
-  category: string;
+  project: string;
   type: TransactionType;
   projectId: string | null; // null for general contributions
   userId: string; // Usuario que hace el aporte o gasto

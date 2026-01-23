@@ -66,7 +66,7 @@ export const addInitialContribution = async (
 
     await addDoc(transactionsRef, {
       amount,
-      category: 'Aporte',
+      project: 'Aporte',
       type: 'contribution',
       projectId: null,
       userId,

@@ -4,7 +4,7 @@ import { TransactionType } from '../types';
 
 interface AddTransactionParams {
   amount: number;
-  category: string;
+  project: string;
   type: TransactionType;
   projectId: string | null;
   userId: string; // Usuario que hace el aporte o gasto
@@ -13,14 +13,14 @@ interface AddTransactionParams {
 }
 
 export const addTransaction = async (params: AddTransactionParams): Promise<void> => {
-  const { amount, category, type, projectId, userId, registeredBy, description } = params;
+  const { amount, project, type, projectId, userId, registeredBy, description } = params;
 
   try {
     const transactionsRef = collection(db, 'transactions');
 
     await addDoc(transactionsRef, {
       amount,
-      category,
+      project,
       type,
       projectId,
       userId,

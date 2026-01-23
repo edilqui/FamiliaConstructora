@@ -52,7 +52,7 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
 
       await addTransaction({
         amount: amountValue,
-        category: selectedProject?.name || 'Gasto',
+        project: selectedProject?.name || 'Gasto',
         type: 'expense',
         projectId: projectId,
         userId: user.id,

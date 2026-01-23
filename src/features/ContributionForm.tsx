@@ -43,7 +43,7 @@ export default function ContributionForm({ onClose }: ContributionFormProps) {
     try {
       await addTransaction({
         amount: parseFloat(amount),
-        category: 'Aporte',
+        project: 'Aporte',
         type: 'contribution',
         projectId: null,
         userId: userId,
