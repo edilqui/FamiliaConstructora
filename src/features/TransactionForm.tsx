@@ -7,13 +7,14 @@ import { cn, formatCurrency } from '../lib/utils';
 
 interface TransactionFormProps {
   onClose: () => void;
+  defaultProjectId?: string;
 }
 
-export default function TransactionForm({ onClose }: TransactionFormProps) {
+export default function TransactionForm({ onClose, defaultProjectId }: TransactionFormProps) {
   const { projects, categories, totalInBox } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
-  const [projectId, setProjectId] = useState<string>('');
+  const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [categoryId, setCategoryId] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');

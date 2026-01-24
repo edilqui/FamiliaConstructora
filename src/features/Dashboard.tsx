@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { formatCurrency } from '../lib/utils';
 import { cn } from '../lib/utils';
@@ -9,6 +10,7 @@ import InitializeDataPanel from '../components/InitializeDataPanel';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { projects, totalInBox, userStats, projectStats, loading } = useDashboardData();
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
@@ -150,9 +152,10 @@ export default function Dashboard() {
               if (!project) return null;
 
               return (
-                <div
+                <button
                   key={stat.projectId}
-                  className="bg-white p-5 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                  onClick={() => navigate(`/project/${stat.projectId}`)}
+                  className="bg-white p-5 rounded-lg shadow-md hover:shadow-lg transition-all text-left w-full cursor-pointer hover:border-2 hover:border-primary-500"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="font-semibold text-gray-800">{stat.projectName}</h3>
@@ -183,7 +186,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -191,7 +194,7 @@ export default function Dashboard() {
       </div>
 
       {/* FABs - Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-20">
+      <div className="fixed bottom-20 sm:bottom-24 right-4 flex flex-col gap-3 z-40">
         {/* FAB Aporte (Verde) */}
         <button
           onClick={() => setShowContributionForm(true)}

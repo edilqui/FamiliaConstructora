@@ -9,6 +9,7 @@ import Balance from './features/Balance';
 import Settings from './features/Settings';
 import CategoriesManager from './features/CategoriesManager';
 import ProjectsManager from './features/ProjectsManager';
+import ProjectExpenses from './features/ProjectExpenses';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
 
@@ -65,6 +66,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Expenses />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:projectId"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectExpenses />
               </Layout>
             </ProtectedRoute>
           }
