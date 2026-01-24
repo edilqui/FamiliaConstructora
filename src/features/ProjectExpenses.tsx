@@ -62,7 +62,11 @@ export default function ProjectExpenses() {
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: typeof projectTransactions } = {};
     projectTransactions.forEach(t => {
-      const dateKey = format(t.date, 'yyyy-MM-dd');
+      // Usar getFullYear, getMonth, getDate para obtener la fecha en zona horaria local
+      const year = t.date.getFullYear();
+      const month = String(t.date.getMonth() + 1).padStart(2, '0');
+      const day = String(t.date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });

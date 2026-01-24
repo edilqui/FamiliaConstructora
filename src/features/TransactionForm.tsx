@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
@@ -14,7 +14,7 @@ interface TransactionFormProps {
 }
 
 export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
-  const { projects, categories, totalInBox } = useDashboardData();
+  const { projects, categories, totalInBox, users } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
   const isEditMode = !!transactionToEdit;
@@ -24,6 +24,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [paymentSource, setPaymentSource] = useState<string>('caja'); // 'caja' o userId
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -83,8 +84,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       return;
     }
 
-    // Validar que hay suficiente dinero en caja (solo al crear, no al editar)
-    if (!isEditMode && amountValue > totalInBox) {
+    // Validar saldo en caja solo si se paga desde caja (no si un usuario paga con sus recursos)
+    if (!isEditMode && paymentSource === 'caja' && amountValue > totalInBox) {
       setError(`No hay suficiente dinero en caja. Disponible: ${formatCurrency(totalInBox)}`);
       return;
     }
@@ -94,6 +95,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     try {
       const selectedProject = projects.find(p => p.id === projectId);
       const selectedCategory = categories.find(c => c.id === categoryId);
+
+      // Crear fecha en zona horaria local para evitar problemas de UTC
+      const [year, month, day] = date.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day, 12, 0, 0); // Mediodía local
 
       if (isEditMode && transactionToEdit) {
         // Actualizar transacción existente
@@ -107,22 +112,55 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           categoryName: selectedCategory?.name || 'Sin categoría',
           userId: transactionToEdit.userId, // Mantener el usuario original
           description: description || `Gasto en ${selectedProject?.name}`,
-          date: new Date(date),
+          date: transactionDate,
         });
       } else {
-        // Crear nueva transacción
-        await addTransaction({
-          amount: amountValue,
-          project: selectedProject?.name || 'Gasto',
-          type: 'expense',
-          projectId: projectId,
-          categoryId: categoryId,
-          categoryName: selectedCategory?.name || 'Sin categoría',
-          userId: user.id,
-          registeredBy: user.id,
-          description: description || `Gasto en ${selectedProject?.name}`,
-          date: new Date(date),
-        });
+        // Si un usuario paga con sus recursos, crear dos transacciones
+        if (paymentSource !== 'caja') {
+          const payingUser = users.find(u => u.id === paymentSource);
+
+          // 1. Registrar el aporte del usuario
+          await addTransaction({
+            amount: amountValue,
+            project: 'Aporte',
+            type: 'contribution',
+            projectId: null,
+            categoryId: null,
+            categoryName: 'N/A',
+            userId: paymentSource,
+            registeredBy: user.id,
+            description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo de gasto)`,
+            date: transactionDate,
+          });
+
+          // 2. Registrar el gasto desde caja
+          await addTransaction({
+            amount: amountValue,
+            project: selectedProject?.name || 'Gasto',
+            type: 'expense',
+            projectId: projectId,
+            categoryId: categoryId,
+            categoryName: selectedCategory?.name || 'Sin categoría',
+            userId: user.id,
+            registeredBy: user.id,
+            description: description || `Gasto en ${selectedProject?.name} (pagado por ${payingUser?.name})`,
+            date: transactionDate,
+          });
+        } else {
+          // Pago normal desde caja
+          await addTransaction({
+            amount: amountValue,
+            project: selectedProject?.name || 'Gasto',
+            type: 'expense',
+            projectId: projectId,
+            categoryId: categoryId,
+            categoryName: selectedCategory?.name || 'Sin categoría',
+            userId: user.id,
+            registeredBy: user.id,
+            description: description || `Gasto en ${selectedProject?.name}`,
+            date: transactionDate,
+          });
+        }
       }
 
       onClose();
@@ -178,14 +216,18 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           )}
 
           {/* Saldo disponible */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>Disponible en caja:</strong> {formatCurrency(totalInBox)}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Este gasto se restará del total en caja
-            </p>
-          </div>
+          {!isEditMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Disponible en caja:</strong> {formatCurrency(totalInBox)}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                {paymentSource === 'caja'
+                  ? 'Este gasto se restará del total en caja'
+                  : 'Se registrará un aporte automático y luego el gasto'}
+              </p>
+            </div>
+          )}
 
           {/* Proyecto */}
           <div>
@@ -207,6 +249,49 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
               ))}
             </select>
           </div>
+
+          {/* Fuente de Pago - Solo en modo crear */}
+          {!isEditMode && (
+            <div>
+              <label htmlFor="paymentSource" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  ¿De dónde sale el pago?
+                </div>
+              </label>
+              <select
+                id="paymentSource"
+                value={paymentSource}
+                onChange={(e) => setPaymentSource(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                required
+              >
+                <option value="caja">💰 Desde Caja (dinero disponible)</option>
+                <optgroup label="👤 Pago directo de un hermano">
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.id === user?.id ? '(Yo)' : ''} - Paga con sus recursos
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              {paymentSource === 'caja' ? (
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 El gasto se descontará de la caja común
+                </p>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
+                  <p className="text-xs text-green-800">
+                    <strong>✓ Doble registro automático:</strong>
+                  </p>
+                  <ul className="text-xs text-green-700 mt-1 ml-4 list-disc space-y-0.5">
+                    <li>Se registrará un aporte de {users.find(u => u.id === paymentSource)?.name || 'este hermano'}</li>
+                    <li>Se registrará el gasto desde caja</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Categoría */}
           <div>
@@ -252,7 +337,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           {/* Descripción */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Descripción del Gasto
+              Descripción del Gasto (Opcional)
             </label>
             <textarea
               id="description"
@@ -261,7 +346,6 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
               placeholder="Ej: Compra de cerámica, Pago de mano de obra..."
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-              required
             />
           </div>
 

@@ -3,7 +3,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { 
   Search, Filter, Plus, Minus, ArrowUpCircle, ArrowDownCircle, 
-  Calendar, Trash2, X, ChevronDown, Wallet
+  Trash2, X, Wallet
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
@@ -49,7 +49,7 @@ export default function Expenses() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // --- LÓGICA DE FILTRADO (INTACTA) ---
+  // --- LÓGICA DE FILTRADO ---
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
 
@@ -70,20 +70,28 @@ export default function Expenses() {
   const filteredStats = useMemo(() => {
     const contributions = filteredTransactions
       .filter((t) => t.type === 'contribution')
-      .reduce((sum, t) => sum + (t.amount || 0), 0); // Fix NaN
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
     const expenses = filteredTransactions
       .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + (t.amount || 0), 0); // Fix NaN
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
     return { contributions, expenses };
   }, [filteredTransactions]);
 
   const hasActiveFilters = filterType !== 'all' || filterProject !== 'all' || filterCategory !== 'all' || searchTerm !== '';
 
-  // Agrupar transacciones por fecha (Estilo agenda)
+  // --- AGRUPACIÓN POR FECHA (CORREGIDA) ---
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: typeof filteredTransactions } = {};
     filteredTransactions.forEach(t => {
-      const dateKey = format(t.date, 'yyyy-MM-dd');
+      // Usamos getFullYear, getMonth, getDate para obtener la fecha LOCAL
+      const date = new Date(t.date); 
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      // Creamos la llave como string "2026-01-24"
+      const dateKey = `${year}-${month}-${day}`;
+      
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
@@ -187,7 +195,7 @@ export default function Expenses() {
           </div>
 
           <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-3 opacity-10">
+              <div className="absolute top-0 right-0 p-3 opacity-10">
               <ArrowDownCircle className="w-12 h-12 text-red-600" />
             </div>
             <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Total Gastos</p>
@@ -201,83 +209,83 @@ export default function Expenses() {
         <div className="space-y-6">
           {Object.keys(groupedTransactions).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center opacity-60">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                <Search className="w-6 h-6 text-gray-400" />
-              </div>
               <p className="text-gray-500 text-sm">No se encontraron movimientos</p>
             </div>
           ) : (
-            // Renderizado por Grupos de Fecha
             Object.entries(groupedTransactions)
-              .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-              .map(([dateKey, groupItems]) => (
-              <div key={dateKey}>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sticky top-28 ml-1">
-                  {format(new Date(dateKey), "EEEE, d 'de' MMMM", { locale: es })}
-                </h3>
+              .sort((a, b) => new Date(b[0] + 'T12:00:00').getTime() - new Date(a[0] + 'T12:00:00').getTime())
+              .map(([dateKey, groupItems]) => {
                 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-                  {groupItems.map((t) => {
-                    const isExpense = t.type === 'expense';
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => handleEditTransaction(t)}
-                        className="w-full p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
-                      >
-                        {/* Icono */}
-                        <div className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                          isExpense ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
-                        )}>
-                          {isExpense ? <ArrowDownCircle className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
-                        </div>
+                // --- CORRECCIÓN DE FECHA ---
+                const [year, month, day] = dateKey.split('-').map(Number);
+                const headerDate = new Date(year, month - 1, day);
 
-                        {/* Info Principal */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                            <span className="truncate max-w-[100px]">{t.project}</span>
-                            {isExpense && t.categoryName !== 'N/A' && (
-                              <>
-                                <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                                <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                  {t.categoryName}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                return (
+                  <div key={dateKey}>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sticky top-28 ml-1">
+                      {format(headerDate, "EEEE, d 'de' MMMM", { locale: es })}
+                    </h3>
+                    
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+                      {groupItems.map((t) => {
+                        const isExpense = t.type === 'expense';
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => handleEditTransaction(t)}
+                            className="w-full p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                          >
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                              isExpense ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
+                            )}>
+                              {isExpense ? <ArrowDownCircle className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                            </div>
 
-                        {/* Monto */}
-                        <div className="text-right flex-shrink-0">
-                          <p className={cn(
-                            "text-sm font-bold",
-                            isExpense ? "text-gray-900" : "text-emerald-600"
-                          )}>
-                            {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {format(t.date, 'HH:mm')}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                <span className="truncate max-w-[100px]">{t.project}</span>
+                                {isExpense && t.categoryName !== 'N/A' && (
+                                  <>
+                                    <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                                    <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                      {t.categoryName}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right flex-shrink-0">
+                              <p className={cn(
+                                "text-sm font-bold",
+                                isExpense ? "text-gray-900" : "text-emerald-600"
+                              )}>
+                                {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
+                              </p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {format(t.date, 'HH:mm')}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
           )}
         </div>
       </div>
 
-      {/* --- BOTÓN FLOTANTE (FAB) EXPANDIBLE --- */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+      {/* --- BOTÓN FLOTANTE (FAB) RESTAURADO --- */}
+      <div className="fixed bottom-20 right-6 z-40 flex flex-col items-end gap-3">
         {isFabOpen && (
           <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
             <button 
               onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }}
-              className="flex items-center gap-3 pr-1"
+              className="flex items-center gap-3 pr-1 group"
             >
               <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">
                 Nuevo Aporte
@@ -289,7 +297,7 @@ export default function Expenses() {
 
             <button 
               onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }}
-              className="flex items-center gap-3 pr-1"
+              className="flex items-center gap-3 pr-1 group"
             >
               <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">
                 Registrar Gasto
@@ -304,11 +312,11 @@ export default function Expenses() {
         <button
           onClick={() => setIsFabOpen(!isFabOpen)}
           className={cn(
-            "w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95",
-            isFabOpen ? "bg-gray-800 rotate-45" : "bg-blue-600"
+            "w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 bg-gray-900 text-white",
+            isFabOpen && "rotate-45"
           )}
         >
-          <Plus className="w-7 h-7 text-white" />
+          <Plus className="w-7 h-7" />
         </button>
       </div>
 

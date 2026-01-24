@@ -76,6 +76,10 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
     try {
       const userName = users.find(u => u.id === userId)?.name || 'usuario';
 
+      // Crear fecha en zona horaria local para evitar problemas de UTC
+      const [year, month, day] = date.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day, 12, 0, 0); // Mediodía local
+
       if (isEditMode && transactionToEdit) {
         // Actualizar aporte existente
         await updateTransaction({
@@ -88,7 +92,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           categoryName: 'N/A',
           userId: userId,
           description: description || `Aporte de ${userName}`,
-          date: new Date(date),
+          date: transactionDate,
         });
       } else {
         // Crear nuevo aporte
@@ -102,7 +106,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           userId: userId,
           registeredBy: currentUser.id,
           description: description || `Aporte de ${userName}`,
-          date: new Date(date),
+          date: transactionDate,
         });
       }
 
