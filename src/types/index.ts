@@ -57,6 +57,8 @@ export interface DashboardData {
   categories: Category[];
   transactions: Transaction[];
   totalInBox: number; // Total aportes - Total gastos
+  totalContributions: number; // Total de aportes
+  totalExpenses: number; // Total de gastos
   userStats: UserStats[];
   projectStats: ProjectStats[];
 }

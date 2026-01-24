@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { User, Project, Category, Transaction, DashboardData, UserStats, ProjectStats } from '../types';
 
@@ -136,6 +136,8 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     categories,
     transactions,
     totalInBox,
+    totalContributions,
+    totalExpenses,
     userStats,
     projectStats,
     loading,

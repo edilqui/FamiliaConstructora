@@ -3,7 +3,7 @@ import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, Ch
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
-import { cn, formatCurrency } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';

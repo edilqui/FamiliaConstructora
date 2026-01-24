@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
-import { 
-  Search, Filter, Minus, Calendar, Trash2, ArrowLeft, 
-  FolderKanban, Receipt, ChevronDown, Wallet, ArrowDownCircle
+import {
+  Search, Filter, Minus, Trash2, ArrowLeft,
+  FolderKanban, Receipt, ArrowDownCircle
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';

@@ -3,7 +3,6 @@ import { X, Loader2, DollarSign, Calendar, Trash2, AlertTriangle, Clock, Chevron
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
-import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
