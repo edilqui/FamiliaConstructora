@@ -1,11 +1,12 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { X, Loader2, DollarSign, Calendar, Trash2, AlertTriangle, Clock, ChevronDown, User } from 'lucide-react';
+import { X, Loader2, DollarSign, Calendar, Trash2, AlertTriangle, Clock, ChevronDown, User, Calculator } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
+import CalculatorComponent from '../components/Calculator';
 
 interface ContributionFormProps {
   onClose: () => void;
@@ -30,6 +31,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
 
   // Cargar datos en edición
   useEffect(() => {
@@ -153,18 +155,28 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           {/* MONTO (Input Gigante) */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Monto del Aporte</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
-              <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-emerald-50/50 border-2 border-transparent focus:border-emerald-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
-                required
-                autoFocus={!isEditMode}
-              />
+            <div className="relative flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-emerald-50/50 border-2 border-transparent focus:border-emerald-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
+                  required
+                  autoFocus={!isEditMode}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCalculator(true)}
+                className="flex-shrink-0 w-16 h-16 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl flex items-center justify-center transition-colors active:scale-95"
+                title="Abrir calculadora"
+              >
+                <Calculator className="w-7 h-7" />
+              </button>
             </div>
           </div>
 
@@ -314,6 +326,18 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           </div>
         )}
       </div>
+
+      {/* Calculadora Modal */}
+      {showCalculator && (
+        <CalculatorComponent
+          onClose={() => setShowCalculator(false)}
+          onConfirm={(value) => {
+            setAmount(value);
+            setShowCalculator(false);
+          }}
+          initialValue={amount}
+        />
+      )}
     </div>
   );
 }
