@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { User, Project, Transaction, DashboardData, UserStats, ProjectStats } from '../types';
+import { User, Project, Category, Transaction, DashboardData, UserStats, ProjectStats } from '../types';
 
 export const useDashboardData = (): DashboardData & { loading: boolean } => {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,6 +31,26 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
       setProjects(projectsData);
     });
 
+    // Suscribirse a categorías
+    const categoriesQuery = query(collection(db, 'categories'));
+    const unsubCategories = onSnapshot(
+      categoriesQuery,
+      (snapshot) => {
+        const categoriesData = snapshot.docs.map((doc) => ({
+          ...doc.data(),
+          id: doc.id,
+        })) as Category[];
+        // Ordenar manualmente en el cliente
+        categoriesData.sort((a, b) => a.order - b.order);
+        setCategories(categoriesData);
+        console.log('✅ Categorías cargadas:', categoriesData.length);
+      },
+      (error) => {
+        console.error('❌ Error al cargar categorías:', error);
+        setCategories([]);
+      }
+    );
+
     // Suscribirse a transacciones
     const transactionsQuery = query(collection(db, 'transactions'));
     const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
@@ -49,6 +70,7 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     return () => {
       unsubUsers();
       unsubProjects();
+      unsubCategories();
       unsubTransactions();
     };
   }, []);
@@ -111,6 +133,7 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
   return {
     users,
     projects,
+    categories,
     transactions,
     totalInBox,
     userStats,

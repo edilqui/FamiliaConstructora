@@ -10,14 +10,18 @@ interface TransactionFormProps {
 }
 
 export default function TransactionForm({ onClose }: TransactionFormProps) {
-  const { projects, totalInBox } = useDashboardData();
+  const { projects, categories, totalInBox } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
   const [projectId, setProjectId] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Log para depuración
+  console.log('📊 TransactionForm - Categorías recibidas:', categories.length, categories);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,6 +34,11 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
 
     if (!projectId) {
       setError('Selecciona un proyecto');
+      return;
+    }
+
+    if (!categoryId) {
+      setError('Selecciona una categoría');
       return;
     }
 
@@ -49,12 +58,15 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
 
     try {
       const selectedProject = projects.find(p => p.id === projectId);
+      const selectedCategory = categories.find(c => c.id === categoryId);
 
       await addTransaction({
         amount: amountValue,
         project: selectedProject?.name || 'Gasto',
         type: 'expense',
         projectId: projectId,
+        categoryId: categoryId,
+        categoryName: selectedCategory?.name || 'Sin categoría',
         userId: user.id,
         registeredBy: user.id,
         description: description || `Gasto en ${selectedProject?.name}`,
@@ -124,6 +136,27 @@ export default function TransactionForm({ onClose }: TransactionFormProps) {
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Categoría */}
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+              Categoría del Gasto
+            </label>
+            <select
+              id="category"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              required
+            >
+              <option value="">Seleccionar categoría...</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>

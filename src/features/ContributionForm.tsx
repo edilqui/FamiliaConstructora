@@ -46,6 +46,8 @@ export default function ContributionForm({ onClose }: ContributionFormProps) {
         project: 'Aporte',
         type: 'contribution',
         projectId: null,
+        categoryId: null,
+        categoryName: 'N/A',
         userId: userId,
         registeredBy: currentUser.id,
         description: description || `Aporte de ${users.find(u => u.id === userId)?.name || 'usuario'}`,

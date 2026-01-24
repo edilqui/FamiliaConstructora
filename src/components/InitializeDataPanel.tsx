@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { initializeProjects, addInitialContribution } from '../services/initializeData';
+import { initializeProjects, initializeCategories, addInitialContribution } from '../services/initializeData';
 import { useAuthStore } from '../store/useAuthStore';
-import { Database, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Database, Loader2, CheckCircle, XCircle, Tag } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function InitializeDataPanel() {
@@ -16,6 +16,18 @@ export default function InitializeDataPanel() {
     setMessageType('');
 
     const result = await initializeProjects();
+
+    setMessage(result.message);
+    setMessageType(result.success ? 'success' : 'error');
+    setLoading(false);
+  };
+
+  const handleInitializeCategories = async () => {
+    setLoading(true);
+    setMessage('');
+    setMessageType('');
+
+    const result = await initializeCategories();
 
     setMessage(result.message);
     setMessageType(result.success ? 'success' : 'error');
@@ -105,6 +117,27 @@ export default function InitializeDataPanel() {
         </button>
 
         <button
+          onClick={handleInitializeCategories}
+          disabled={loading}
+          className={cn(
+            'w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2',
+            loading && 'opacity-50 cursor-not-allowed'
+          )}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Creando categorías...
+            </>
+          ) : (
+            <>
+              <Tag className="w-5 h-5" />
+              Crear Categorías
+            </>
+          )}
+        </button>
+
+        <button
           onClick={handleAddContribution}
           disabled={loading}
           className={cn(
@@ -122,9 +155,9 @@ export default function InitializeDataPanel() {
           <strong>Instrucciones:</strong>
         </p>
         <ul className="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
-          <li>Haz clic en "Crear Proyectos Iniciales" para crear los 4 proyectos base</li>
+          <li>Haz clic en "Crear Proyectos Iniciales" primero</li>
+          <li>Si no ves categorías, haz clic en "Crear Categorías"</li>
           <li>Luego, cada hermano puede agregar su aporte inicial</li>
-          <li>Este panel solo aparece cuando no hay proyectos</li>
         </ul>
       </div>
     </div>

@@ -7,13 +7,15 @@ interface AddTransactionParams {
   project: string;
   type: TransactionType;
   projectId: string | null;
+  categoryId: string | null; // null for contributions
+  categoryName: string; // Nombre de la categoría
   userId: string; // Usuario que hace el aporte o gasto
   registeredBy: string; // Usuario que registra la transacción
   description: string;
 }
 
 export const addTransaction = async (params: AddTransactionParams): Promise<void> => {
-  const { amount, project, type, projectId, userId, registeredBy, description } = params;
+  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, description } = params;
 
   try {
     const transactionsRef = collection(db, 'transactions');
@@ -23,6 +25,8 @@ export const addTransaction = async (params: AddTransactionParams): Promise<void
       project,
       type,
       projectId,
+      categoryId,
+      categoryName,
       userId,
       registeredBy,
       description,

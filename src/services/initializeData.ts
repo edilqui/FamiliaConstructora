@@ -22,6 +22,18 @@ const initialProjects = [
   },
 ];
 
+const initialCategories = [
+  { name: "Materiales", order: 1 },
+  { name: "Jornales", order: 2 },
+  { name: "Enseres", order: 3 },
+  { name: "Pagos Extra", order: 4 },
+  { name: "Cemento", order: 5 },
+  { name: "Varilla", order: 6 },
+  { name: "Arena", order: 7 },
+  { name: "Electricidad", order: 8 },
+  { name: "Aguas Limpias", order: 9 },
+];
+
 export const initializeProjects = async (): Promise<{ success: boolean; message: string }> => {
   try {
     // Verificar si ya existen proyectos
@@ -36,21 +48,57 @@ export const initializeProjects = async (): Promise<{ success: boolean; message:
     }
 
     // Crear los proyectos iniciales
-    const promises = initialProjects.map((project) =>
+    const projectPromises = initialProjects.map((project) =>
       addDoc(projectsRef, project)
     );
 
-    await Promise.all(promises);
+    await Promise.all(projectPromises);
+
+    // Inicializar categorías automáticamente
+    await initializeCategories();
 
     return {
       success: true,
-      message: `✅ ${initialProjects.length} proyectos creados exitosamente: Construcción de Apartamentos, Adecuación de casa de papás y Aportes herramientas.`,
+      message: `✅ ${initialProjects.length} proyectos y ${initialCategories.length} categorías creados exitosamente.`,
     };
   } catch (error) {
     console.error('Error al inicializar proyectos:', error);
     return {
       success: false,
       message: `❌ Error al crear proyectos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+    };
+  }
+};
+
+export const initializeCategories = async (): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Verificar si ya existen categorías
+    const categoriesRef = collection(db, 'categories');
+    const snapshot = await getDocs(categoriesRef);
+
+    if (snapshot.size > 0) {
+      return {
+        success: false,
+        message: `Ya existen ${snapshot.size} categoría(s) en la base de datos.`,
+      };
+    }
+
+    // Crear las categorías iniciales
+    const categoryPromises = initialCategories.map((category) =>
+      addDoc(categoriesRef, category)
+    );
+
+    await Promise.all(categoryPromises);
+
+    return {
+      success: true,
+      message: `✅ ${initialCategories.length} categorías creadas exitosamente.`,
+    };
+  } catch (error) {
+    console.error('Error al inicializar categorías:', error);
+    return {
+      success: false,
+      message: `❌ Error al crear categorías: ${error instanceof Error ? error.message : 'Error desconocido'}`,
     };
   }
 };
@@ -69,7 +117,10 @@ export const addInitialContribution = async (
       project: 'Aporte',
       type: 'contribution',
       projectId: null,
+      categoryId: null,
+      categoryName: 'N/A',
       userId,
+      registeredBy: userId,
       description,
       date: new Date(),
       createdAt: new Date(),

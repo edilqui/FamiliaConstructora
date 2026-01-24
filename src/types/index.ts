@@ -11,6 +11,12 @@ export interface Project {
   status: 'active' | 'completed' | 'paused';
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  order: number; // Para ordenar las categorías
+}
+
 export type TransactionType = 'expense' | 'contribution';
 
 export interface Transaction {
@@ -19,6 +25,8 @@ export interface Transaction {
   project: string;
   type: TransactionType;
   projectId: string | null; // null for general contributions
+  categoryId: string | null; // null for contributions, required for expenses
+  categoryName: string; // Nombre de la categoría para mostrar
   userId: string; // Usuario que hace el aporte o gasto
   registeredBy: string; // Usuario que registra la transacción
   date: Date;
@@ -45,6 +53,7 @@ export interface ProjectStats {
 export interface DashboardData {
   users: User[];
   projects: Project[];
+  categories: Category[];
   transactions: Transaction[];
   totalInBox: number; // Total aportes - Total gastos
   userStats: UserStats[];
