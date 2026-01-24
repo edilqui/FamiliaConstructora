@@ -16,7 +16,7 @@ const navItems: NavItem[] = [
   },
   {
     path: '/expenses',
-    label: 'Gastos',
+    label: 'Moviemientos',
     icon: Wallet,
   },
   {

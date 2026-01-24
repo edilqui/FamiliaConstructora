@@ -22,8 +22,9 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [categoryId, setCategoryId] = useState<string>('');
   const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  
+  const [description, setDescription] = useState(''); // Nombre corto
+  const [notes, setNotes] = useState(''); // Notas adicionales
+
   // FECHA Y HORA SEPARADAS
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(format(new Date(), 'HH:mm'));
@@ -40,6 +41,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       setCategoryId(transactionToEdit.categoryId || '');
       setAmount(transactionToEdit.amount.toString());
       setDescription(transactionToEdit.description);
+      setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
       setTime(format(transactionToEdit.date, 'HH:mm')); // Extraer hora existente
     }
@@ -96,6 +98,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           categoryName: selectedCategory?.name || 'Sin categoría',
           userId: transactionToEdit.userId,
           description: description || `Gasto en ${selectedProject?.name}`,
+          notes: notes || undefined,
           date: transactionDate,
         });
       } else {
@@ -112,6 +115,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             userId: paymentSource,
             registeredBy: user.id,
             description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo)`,
+            notes: notes || undefined,
             date: transactionDate,
           });
           // 2. Gasto
@@ -125,6 +129,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             userId: user.id,
             registeredBy: user.id,
             description: description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`,
+            notes: notes || undefined,
             date: transactionDate,
           });
         } else {
@@ -138,6 +143,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             userId: user.id,
             registeredBy: user.id,
             description: description || `Gasto en ${selectedProject?.name}`,
+            notes: notes || undefined,
             date: transactionDate,
           });
         }
@@ -151,7 +157,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end bottom-20 sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
@@ -202,6 +208,19 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                 Disponible: <span className="font-semibold text-gray-600">{formatCurrency(totalInBox)}</span>
               </p>
             )}
+          </div>
+
+          {/* NOMBRE */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Nombre del Gasto</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ej: Cemento, Pintura, Electricista..."
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:bg-white outline-none transition-all font-medium"
+              required
+            />
           </div>
 
           {/* SELECTORES (Proyecto y Categoría) */}
@@ -265,13 +284,13 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             </div>
           )}
 
-          {/* DESCRIPCIÓN */}
+          {/* NOTAS */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Nota / Detalle</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Notas (Opcional)</label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Materiales para el baño..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Añade detalles adicionales sobre este gasto..."
               rows={2}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:bg-white outline-none transition-all resize-none"
             />

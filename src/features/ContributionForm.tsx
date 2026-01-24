@@ -20,8 +20,9 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   // Estados
   const [userId, setUserId] = useState(currentUser?.id || '');
   const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  
+  const [description, setDescription] = useState(''); // Nombre corto
+  const [notes, setNotes] = useState(''); // Notas adicionales
+
   // FECHA Y HORA SEPARADAS
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(format(new Date(), 'HH:mm'));
@@ -36,6 +37,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
       setUserId(transactionToEdit.userId);
       setAmount(transactionToEdit.amount.toString());
       setDescription(transactionToEdit.description);
+      setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
       setTime(format(transactionToEdit.date, 'HH:mm')); // Extraer hora
     }
@@ -86,6 +88,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           categoryName: 'N/A',
           userId: userId,
           description: description || `Aporte de ${userName}`,
+          notes: notes || undefined,
           date: transactionDate,
         });
       } else {
@@ -99,6 +102,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           userId: userId,
           registeredBy: currentUser.id,
           description: description || `Aporte de ${userName}`,
+          notes: notes || undefined,
           date: transactionDate,
         });
       }
@@ -111,7 +115,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed bottom-20 inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
@@ -164,6 +168,19 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             </div>
           </div>
 
+          {/* NOMBRE */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Nombre del Aporte</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ej: Aporte mensual, Cuota extra..."
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all font-medium"
+              required
+            />
+          </div>
+
           {/* QUIÉN APORTA */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">¿Quién aporta?</label>
@@ -191,13 +208,13 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             )}
           </div>
 
-          {/* DESCRIPCIÓN */}
+          {/* NOTAS */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Nota (Opcional)</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Notas (Opcional)</label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Aporte mensual, cuota extra..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Añade detalles adicionales sobre este aporte..."
               rows={2}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all resize-none"
             />

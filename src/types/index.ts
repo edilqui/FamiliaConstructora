@@ -30,7 +30,8 @@ export interface Transaction {
   userId: string; // Usuario que hace el aporte o gasto
   registeredBy: string; // Usuario que registra la transacción
   date: Date;
-  description: string;
+  description: string; // Nombre corto de la transacción
+  notes?: string; // Notas adicionales (opcional)
   createdAt: Date;
 }
 
