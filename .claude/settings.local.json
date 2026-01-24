@@ -5,7 +5,10 @@
       "Bash(npm install)",
       "Bash(npm install:*)",
       "Bash(dir:*)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
