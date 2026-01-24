@@ -1,640 +1,516 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
-import { formatCurrency } from '../lib/utils';
-import { cn } from '../lib/utils';
-import { Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown, BarChart3, Filter, ChevronDown } from 'lucide-react';
+import { formatCurrency, cn } from '../lib/utils';
+import {
+  Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown,
+  BarChart3, Filter, X, PieChart as PieIcon, Check, Users
+} from 'lucide-react';
 import TransactionForm from './TransactionForm';
 import ContributionForm from './ContributionForm';
 import InitializeDataPanel from '../components/InitializeDataPanel';
 import { useAuthStore } from '../store/useAuthStore';
 import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  LineChart,
-  Line,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, startOfWeek, startOfMonth, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval, isWithinInterval, addMonths } from 'date-fns';
+import { format, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval, isWithinInterval, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { projects, categories, transactions, totalInBox, userStats, projectStats, loading } = useDashboardData();
+  const currentUser = useAuthStore((state) => state.user);
+
+  // Estados de Modales
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
-  const currentUser = useAuthStore((state) => state.user);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
 
   // Analytics states
   const [timePeriod, setTimePeriod] = useState<'weekly' | 'monthly'>('monthly');
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
 
-  // Update selected projects when projects load
+  // Inicializar proyectos seleccionados
   useEffect(() => {
     if (projects.length > 0 && selectedProjects.length === 0) {
       setSelectedProjects(projects.map(p => p.id));
     }
   }, [projects, selectedProjects.length]);
 
-  // Color palettes for charts
   const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
-  // Filter expenses by selected projects
+  // --- LÓGICA DE DATOS ---
   const filteredExpenses = useMemo(() => {
     return transactions.filter(
-      t => t.type === 'expense' &&
-      t.projectId &&
-      selectedProjects.includes(t.projectId)
+      t => t.type === 'expense' && t.projectId && selectedProjects.includes(t.projectId)
     );
   }, [transactions, selectedProjects]);
 
-  // Data for expense trend chart (bar/line chart over time)
   const expenseTrendData = useMemo(() => {
     if (filteredExpenses.length === 0) return [];
-
     const now = new Date();
     const sixMonthsAgo = addMonths(now, -6);
+    const intervals = timePeriod === 'weekly' 
+      ? eachWeekOfInterval({ start: sixMonthsAgo, end: now }, { weekStartsOn: 1 })
+      : eachMonthOfInterval({ start: sixMonthsAgo, end: now });
 
-    if (timePeriod === 'weekly') {
-      const weeks = eachWeekOfInterval({ start: sixMonthsAgo, end: now }, { weekStartsOn: 1 });
-
-      return weeks.map(weekStart => {
-        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-        const weekExpenses = filteredExpenses.filter(t =>
-          isWithinInterval(t.date, { start: weekStart, end: weekEnd })
-        );
-
-        const total = weekExpenses.reduce((sum, t) => sum + t.amount, 0);
-
-        return {
-          period: format(weekStart, 'dd MMM', { locale: es }),
-          total,
-          count: weekExpenses.length,
-        };
-      }).filter(d => d.total > 0 || d.count > 0);
-    } else {
-      const months = eachMonthOfInterval({ start: sixMonthsAgo, end: now });
-
-      return months.map(monthStart => {
-        const monthEnd = endOfMonth(monthStart);
-        const monthExpenses = filteredExpenses.filter(t =>
-          isWithinInterval(t.date, { start: monthStart, end: monthEnd })
-        );
-
-        const total = monthExpenses.reduce((sum, t) => sum + t.amount, 0);
-
-        return {
-          period: format(monthStart, 'MMM yyyy', { locale: es }),
-          total,
-          count: monthExpenses.length,
-        };
-      }).filter(d => d.total > 0 || d.count > 0);
-    }
+    return intervals.map(start => {
+      const end = timePeriod === 'weekly' ? endOfWeek(start, { weekStartsOn: 1 }) : endOfMonth(start);
+      const periodExpenses = filteredExpenses.filter(t => isWithinInterval(t.date, { start, end }));
+      const total = periodExpenses.reduce((sum, t) => sum + t.amount, 0);
+      return {
+        period: format(start, timePeriod === 'weekly' ? 'dd MMM' : 'MMM', { locale: es }),
+        total,
+      };
+    }).filter(d => d.total > 0).slice(-6);
   }, [filteredExpenses, timePeriod]);
 
-  // Data for category distribution pie chart
   const categoryDistributionData = useMemo(() => {
-    const categoryTotals = new Map<string, number>();
-
+    const totals = new Map<string, number>();
     filteredExpenses.forEach(t => {
-      if (t.categoryId) {
-        const current = categoryTotals.get(t.categoryId) || 0;
-        categoryTotals.set(t.categoryId, current + t.amount);
-      }
+      if (t.categoryId) totals.set(t.categoryId, (totals.get(t.categoryId) || 0) + t.amount);
     });
-
-    return Array.from(categoryTotals.entries())
-      .map(([categoryId, total]) => {
-        const category = categories.find(c => c.id === categoryId);
-        return {
-          name: category?.name || 'Sin categoría',
-          value: total,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
+    return Array.from(totals.entries())
+      .map(([id, val]) => ({ name: categories.find(c => c.id === id)?.name || 'Otros', value: val }))
+      .sort((a, b) => b.value - a.value).slice(0, 5);
   }, [filteredExpenses, categories]);
 
-  // Data for project distribution pie chart
-  const projectDistributionData = useMemo(() => {
-    const projectTotals = new Map<string, number>();
+  // Cálculo de progreso de aportes por usuario basado en presupuestos
+  const userContributionProgress = useMemo(() => {
+    // Sumar todos los presupuestos de todos los proyectos
+    const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
 
-    filteredExpenses.forEach(t => {
-      if (t.projectId) {
-        const current = projectTotals.get(t.projectId) || 0;
-        projectTotals.set(t.projectId, current + t.amount);
-      }
-    });
+    // Calcular total de gastos desde transactions
+    const totalExpenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    return Array.from(projectTotals.entries())
-      .map(([projectId, total]) => {
-        const project = projects.find(p => p.id === projectId);
-        return {
-          name: project?.name || 'Sin proyecto',
-          value: total,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
-  }, [filteredExpenses, projects]);
+    // Si no hay presupuesto definido, usar total de gastos como referencia
+    const referenceTotal = totalBudget > 0 ? totalBudget : totalExpenses;
 
-  // Data for cumulative spending trend
-  const cumulativeSpendingData = useMemo(() => {
-    if (filteredExpenses.length === 0) return [];
+    // Calcular cuánto le corresponde a cada usuario (25% si son 4 usuarios)
+    const numberOfUsers = userStats.length || 4;
+    const expectedPerUser = referenceTotal / numberOfUsers;
 
-    const sortedExpenses = [...filteredExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
+    return userStats.map(stats => {
+      const contributed = stats.totalContributed;
+      const expected = expectedPerUser;
+      const remaining = Math.max(0, expected - contributed);
+      const percentage = expected > 0 ? (contributed / expected) * 100 : 0;
 
-    let cumulative = 0;
-    const cumulativeByPeriod = new Map<string, number>();
+      return {
+        name: stats.userName,
+        contributed,
+        remaining,
+        expected,
+        percentage: Math.min(100, percentage), // Cap at 100%
+        isCurrentUser: stats.userId === currentUser?.id,
+      };
+    }).sort((a, b) => b.percentage - a.percentage); // Ordenar por porcentaje descendente
+  }, [userStats, projects, transactions, currentUser]);
 
-    sortedExpenses.forEach(t => {
-      cumulative += t.amount;
-      const periodKey = timePeriod === 'weekly'
-        ? format(startOfWeek(t.date, { weekStartsOn: 1 }), 'dd MMM', { locale: es })
-        : format(startOfMonth(t.date), 'MMM yyyy', { locale: es });
-
-      cumulativeByPeriod.set(periodKey, cumulative);
-    });
-
-    return Array.from(cumulativeByPeriod.entries()).map(([period, total]) => ({
-      period,
-      total,
-    }));
-  }, [filteredExpenses, timePeriod]);
-
-  // Toggle project selection
   const toggleProject = (projectId: string) => {
-    setSelectedProjects(prev =>
-      prev.includes(projectId)
-        ? prev.filter(id => id !== projectId)
-        : [...prev, projectId]
-    );
+    setSelectedProjects(prev => prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]);
   };
 
-  // Toggle all projects
   const toggleAllProjects = () => {
-    if (selectedProjects.length === projects.length) {
-      setSelectedProjects([]);
-    } else {
-      setSelectedProjects(projects.map(p => p.id));
-    }
+    setSelectedProjects(selectedProjects.length === projects.length ? [] : projects.map(p => p.id));
   };
+
+  const hasActiveFilters = selectedProjects.length < projects.length;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    );
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
   }
 
-  // Obtener estadísticas del usuario actual
   const myStats = userStats.find(s => s.userId === currentUser?.id);
 
   return (
-    <div className="space-y-6 pb-24">
-      {/* Total en Caja */}
-      <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <Wallet className="w-6 h-6" />
-          <h2 className="text-lg font-semibold">Total en Caja</h2>
-        </div>
-        <p className="text-4xl font-bold">{formatCurrency(totalInBox)}</p>
-        <p className="text-sm text-blue-100 mt-2">Disponible para gastos</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      
+      {/* --- HEADER (Limpio) --- */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 py-3 border-b border-gray-100 flex justify-between items-center shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+        {/* Aquí ya no está el botón de filtros */}
+      </header>
 
-      {/* Balance Personal */}
-      {myStats && (
-        <div
-          className={cn(
-            'p-6 rounded-lg shadow-md',
-            myStats.balance >= 0
-              ? 'bg-green-50 border-2 border-green-500'
-              : 'bg-red-50 border-2 border-red-500'
-          )}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className={cn(
-                'p-2 rounded-full',
-                myStats.balance >= 0 ? 'bg-green-500' : 'bg-red-500'
-              )}
-            >
-              {myStats.balance >= 0 ? (
-                <TrendingUp className="w-5 h-5 text-white" />
-              ) : (
-                <TrendingDown className="w-5 h-5 text-white" />
-              )}
+      <div className="px-4 pt-6 space-y-6 max-w-lg mx-auto">
+        
+        {/* --- TARJETA PRINCIPAL (Total en Caja) --- */}
+        <div className="relative overflow-hidden rounded-3xl bg-gray-900 text-white shadow-2xl p-6">
+          <div className="absolute top-0 right-0 -mr-8 -mt-8 w-40 h-40 bg-blue-500 rounded-full opacity-20 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-40 h-40 bg-purple-500 rounded-full opacity-20 blur-3xl"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-1 text-gray-300">
+              <Wallet className="w-5 h-5" />
+              <span className="text-sm font-medium">Total Disponible</span>
             </div>
-            <h2 className="text-lg font-semibold text-gray-700">Tu Balance</h2>
-          </div>
-          <p
-            className={cn(
-              'text-3xl font-bold',
-              myStats.balance >= 0 ? 'text-green-700' : 'text-red-700'
+            <p className="text-4xl font-bold tracking-tight mb-4">{formatCurrency(totalInBox)}</p>
+            
+            {myStats && (
+              <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Tu Balance</p>
+                  <div className={cn("flex items-center gap-1.5 font-bold", myStats.balance >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    {myStats.balance >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    <span>{formatCurrency(Math.abs(myStats.balance))}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                   <p className="text-xs text-gray-400 mb-0.5">Aportado</p>
+                   <p className="font-semibold">{formatCurrency(myStats.totalContributed)}</p>
+                </div>
+              </div>
             )}
-          >
-            {formatCurrency(Math.abs(myStats.balance))}
-          </p>
-          <p className="text-sm text-gray-600 mt-1">
-            {myStats.balance >= 0 ? 'A tu favor' : 'Debes aportar'}
-          </p>
-          <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-600">Aportado</p>
-              <p className="font-semibold text-gray-800">{formatCurrency(myStats.totalContributed)}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Tu parte (25%)</p>
-              <p className="font-semibold text-gray-800">{formatCurrency(myStats.share)}</p>
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Analytics Section */}
-      {transactions.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-gray-700" />
-              <h2 className="text-xl font-bold text-gray-800">Análisis de Gastos</h2>
+        {/* --- CHARTS SECTION --- */}
+        {filteredExpenses.length > 0 ? (
+          <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+            
+            {/* Gráfico de Barras (Tendencia) CON BOTÓN DE FILTRO */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-sm">Gráfico de Gastos</h3>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                      {timePeriod === 'weekly' ? 'Vista Semanal' : 'Vista Mensual'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* BOTÓN DE FILTRO INTEGRADO AQUÍ */}
+                <button 
+                  onClick={() => setShowFilterModal(true)}
+                  className="p-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
+                  aria-label="Filtrar Gráfico"
+                >
+                  <Filter className="w-4 h-4" />
+                  {hasActiveFilters && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+                  )}
+                </button>
+              </div>
+
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={expenseTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="period" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} dy={10} />
+                    <Tooltip 
+                      cursor={{fill: '#f3f4f6'}}
+                      contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                    />
+                    <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
-                showFilters ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              )}
-            >
-              <Filter className="w-4 h-4" />
-              Filtros
-              <ChevronDown className={cn("w-4 h-4 transition-transform", showFilters && "rotate-180")} />
-            </button>
-          </div>
 
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="bg-white p-4 rounded-lg shadow-md space-y-4 animate-in slide-in-from-top-2">
-              {/* Time Period Selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Período de tiempo</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTimePeriod('weekly')}
-                    className={cn(
-                      "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors",
-                      timePeriod === 'weekly'
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    )}
-                  >
-                    Semanal
-                  </button>
-                  <button
-                    onClick={() => setTimePeriod('monthly')}
-                    className={cn(
-                      "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors",
-                      timePeriod === 'monthly'
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    )}
-                  >
-                    Mensual
-                  </button>
+            {/* Gráfico Circular (Categorías) */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
+                    <PieIcon className="w-4 h-4" />
+                  </div>
+                <h3 className="font-bold text-gray-800 text-sm">Top Categorías</h3>
+              </div>
+              <div className="flex items-center">
+                <div className="h-40 w-40 relative flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryDistributionData}
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {categoryDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                     <span className="text-xs font-bold text-gray-400">Distr.</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 pl-4 space-y-2">
+                  {categoryDistributionData.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[index % COLORS.length]}} />
+                        <span className="text-gray-600 truncate max-w-[80px]">{entry.name}</span>
+                      </div>
+                      <span className="font-bold text-gray-800">{((entry.value / filteredExpenses.reduce((a,b)=>a+b.amount,0)) * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Gráfico de Progreso de Aportes por Usuario */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">Progreso de Aportes</h3>
+                  <p className="text-[10px] text-gray-400 font-medium">
+                    Basado en presupuestos totales ({formatCurrency(
+                      projects.reduce((s, p) => s + (p.budget || 0), 0) ||
+                      transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+                    )})
+                  </p>
                 </div>
               </div>
 
-              {/* Project Filter */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Proyectos</label>
-                  <button
-                    onClick={toggleAllProjects}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    {selectedProjects.length === projects.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                  </button>
+              <div className="space-y-3">
+                {userContributionProgress.map((user, index) => (
+                  <div key={index} className={cn(
+                    "p-3 rounded-xl border transition-all",
+                    user.isCurrentUser ? "bg-blue-50/50 border-blue-200" : "bg-gray-50 border-gray-100"
+                  )}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold",
+                          user.isCurrentUser ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-700"
+                        )}>
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className={cn(
+                            "text-sm font-bold",
+                            user.isCurrentUser ? "text-blue-900" : "text-gray-800"
+                          )}>
+                            {user.name} {user.isCurrentUser && '(Tú)'}
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {formatCurrency(user.contributed)} / {formatCurrency(user.expected)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn(
+                          "text-lg font-bold",
+                          user.percentage >= 100 ? "text-emerald-600" :
+                          user.percentage >= 50 ? "text-blue-600" : "text-amber-600"
+                        )}>
+                          {user.percentage.toFixed(0)}%
+                        </p>
+                        {user.remaining > 0 && (
+                          <p className="text-[10px] text-gray-500">
+                            Falta: {formatCurrency(user.remaining)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full transition-all duration-500 rounded-full",
+                          user.percentage >= 100 ? "bg-gradient-to-r from-emerald-500 to-emerald-600" :
+                          user.percentage >= 50 ? "bg-gradient-to-r from-blue-500 to-blue-600" :
+                          "bg-gradient-to-r from-amber-500 to-amber-600"
+                        )}
+                        style={{ width: `${Math.min(100, user.percentage)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Info adicional */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>100%+</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>50-99%</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>&lt;50%</span>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {projects.map(project => (
-                    <label
-                      key={project.id}
+              </div>
+            </div>
+
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center opacity-60">
+             <BarChart3 className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+             <p className="text-sm">No hay datos suficientes para los gráficos</p>
+          </div>
+        )}
+
+        {/* --- ACCESOS RÁPIDOS A PROYECTOS --- */}
+        <div>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 ml-1">Proyectos Activos</h3>
+          <div className="grid grid-cols-2 gap-3">
+             {projectStats.slice(0, 4).map(stat => (
+               <button 
+                 key={stat.projectId}
+                 onClick={() => navigate(`/project/${stat.projectId}`)}
+                 className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 text-left hover:border-blue-300 transition-all"
+               >
+                 <p className="text-sm font-bold text-gray-800 truncate mb-1">{stat.projectName}</p>
+                 <p className="text-xs text-gray-500">{stat.transactionCount} movs.</p>
+                 <p className="text-sm font-bold text-blue-600 mt-1">{formatCurrency(stat.totalSpent)}</p>
+               </button>
+             ))}
+             {projects.length === 0 && <InitializeDataPanel />}
+          </div>
+        </div>
+
+      </div>
+
+      {/* --- FAB UNIFICADO --- */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        {isFabOpen && (
+          <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
+            <button 
+              onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }}
+              className="flex items-center gap-3 pr-1 group"
+            >
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                Ingreso
+              </span>
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center hover:bg-emerald-600 transition-colors">
+                <Plus className="w-6 h-6" />
+              </div>
+            </button>
+            <button 
+              onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }}
+              className="flex items-center gap-3 pr-1 group"
+            >
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                Gasto
+              </span>
+              <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                <Minus className="w-6 h-6" />
+              </div>
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setIsFabOpen(!isFabOpen)}
+          className={cn(
+            "w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 bg-gray-900 text-white",
+            isFabOpen && "rotate-45"
+          )}
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      </div>
+
+      {/* --- MODAL DE FILTROS (BOTTOM SHEET) --- */}
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in"
+            onClick={() => setShowFilterModal(false)}
+          />
+          
+          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 animate-in slide-in-from-bottom-10 duration-300">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+            
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Configurar Gráfico</h2>
+              <button onClick={() => setShowFilterModal(false)} className="p-1 rounded-full hover:bg-gray-100">
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Período de Tiempo</label>
+                <div className="flex p-1 bg-gray-100 rounded-xl">
+                  {['weekly', 'monthly'].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setTimePeriod(p as any)}
                       className={cn(
-                        "flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all",
-                        selectedProjects.includes(project.id)
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 bg-white hover:border-gray-300"
+                        "flex-1 py-2 text-sm font-medium rounded-lg transition-all",
+                        timePeriod === p ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                       )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedProjects.includes(project.id)}
-                        onChange={() => toggleProject(project.id)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      {p === 'weekly' ? 'Semanal' : 'Mensual'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos Incluidos</label>
+                  <button onClick={toggleAllProjects} className="text-xs font-medium text-blue-600">
+                    {selectedProjects.length === projects.length ? 'Ocultar todos' : 'Ver todos'}
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  {projects.map(p => (
+                    <label 
+                      key={p.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all",
+                        selectedProjects.includes(p.id) 
+                          ? "border-blue-500 bg-blue-50/50" 
+                          : "border-gray-100 bg-white"
+                      )}
+                    >
+                      <span className={cn("text-sm font-medium", selectedProjects.includes(p.id) ? "text-blue-900" : "text-gray-600")}>
+                        {p.name}
+                      </span>
+                      <div className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center border transition-colors",
+                        selectedProjects.includes(p.id) 
+                          ? "bg-blue-500 border-blue-500" 
+                          : "border-gray-300 bg-white"
+                      )}>
+                        {selectedProjects.includes(p.id) && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        className="hidden" 
+                        checked={selectedProjects.includes(p.id)}
+                        onChange={() => toggleProject(p.id)}
                       />
-                      <span className="text-sm font-medium text-gray-700">{project.name}</span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Charts Grid */}
-          {selectedProjects.length > 0 && filteredExpenses.length > 0 ? (
-            <div className="space-y-4">
-              {/* Expense Trend Chart */}
-              {expenseTrendData.length > 0 && (
-                <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                    Evolución de Gastos ({timePeriod === 'weekly' ? 'Semanal' : 'Mensual'})
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={expenseTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="period"
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Total']}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      />
-                      <Bar dataKey="total" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Cumulative Spending Chart */}
-              {cumulativeSpendingData.length > 0 && (
-                <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                    Gasto Acumulado
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={cumulativeSpendingData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="period"
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Acumulado']}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#10b981"
-                        strokeWidth={3}
-                        dot={{ fill: '#10b981', r: 4 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Pie Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Category Distribution */}
-                {categoryDistributionData.length > 0 && (
-                  <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                      Distribución por Categoría
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={categoryDistributionData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) =>
-                            percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''
-                          }
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {categoryDistributionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number) => `$${value.toLocaleString()}`}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {/* Project Distribution */}
-                {projectDistributionData.length > 0 && (
-                  <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                      Distribución por Proyecto
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={projectDistributionData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) =>
-                            percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''
-                          }
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {projectDistributionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number) => `$${value.toLocaleString()}`}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white p-8 rounded-lg shadow-md text-center">
-              <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">
-                {selectedProjects.length === 0
-                  ? 'Selecciona al menos un proyecto para ver los análisis'
-                  : 'No hay gastos registrados para los proyectos seleccionados'}
-              </p>
-            </div>
-          )}
+            <button 
+              onClick={() => setShowFilterModal(false)}
+              className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl mt-6 active:scale-95 transition-transform"
+            >
+              Aplicar Configuración
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Aportes por Usuario */}
-      <div>
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Aportes por Hermano</h2>
-        {userStats.length === 0 ? (
-          <div className="bg-white p-6 rounded-lg shadow text-center text-gray-500">
-            <p>No hay aportes registrados aún</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {userStats.map((stat) => {
-              const isCurrentUser = stat.userId === currentUser?.id;
-
-              return (
-                <div
-                  key={stat.userId}
-                  className={cn(
-                    'bg-white p-4 rounded-lg shadow-md',
-                    isCurrentUser && 'ring-2 ring-primary-500'
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-gray-800">
-                      {stat.userName}
-                      {isCurrentUser && <span className="text-primary-600 ml-1">(Tú)</span>}
-                    </h3>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(stat.totalContributed)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Aportado</p>
-                  <div className="mt-3 pt-3 border-t">
-                    <p className="text-xs text-gray-600">
-                      Balance:{' '}
-                      <span
-                        className={cn(
-                          'font-semibold',
-                          stat.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                        )}
-                      >
-                        {formatCurrency(Math.abs(stat.balance))}
-                        {stat.balance >= 0 ? ' a favor' : ' debe'}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Proyectos */}
-      <div>
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Gastos por Proyecto</h2>
-
-        {projects.length === 0 ? (
-          <InitializeDataPanel />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projectStats.map((stat) => {
-              const project = projects.find(p => p.id === stat.projectId);
-              if (!project) return null;
-
-              return (
-                <button
-                  key={stat.projectId}
-                  onClick={() => navigate(`/project/${stat.projectId}`)}
-                  className="bg-white p-5 rounded-lg shadow-md hover:shadow-lg transition-all text-left w-full cursor-pointer hover:border-2 hover:border-primary-500"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800">{stat.projectName}</h3>
-                    <span
-                      className={cn(
-                        'text-xs px-2 py-1 rounded-full',
-                        project.status === 'active' && 'bg-green-100 text-green-700',
-                        project.status === 'completed' && 'bg-blue-100 text-blue-700',
-                        project.status === 'paused' && 'bg-yellow-100 text-yellow-700'
-                      )}
-                    >
-                      {project.status === 'active' && 'Activo'}
-                      {project.status === 'completed' && 'Completado'}
-                      {project.status === 'paused' && 'Pausado'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-2xl font-bold text-red-600">
-                        {formatCurrency(stat.totalSpent)}
-                      </p>
-                      <p className="text-xs text-gray-500">Gastado</p>
-                    </div>
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-gray-600">
-                        {stat.transactionCount} {stat.transactionCount === 1 ? 'gasto' : 'gastos'} registrados
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* FABs - Floating Action Buttons */}
-      <div className="fixed bottom-20 sm:bottom-24 right-4 flex flex-col gap-3 z-40">
-        {/* FAB Aporte (Verde) */}
-        <button
-          onClick={() => setShowContributionForm(true)}
-          className="bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center group"
-          aria-label="Agregar aporte"
-          title="Agregar Aporte"
-        >
-          <Plus className="w-6 h-6" />
-          <span className="absolute right-16 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Agregar Aporte
-          </span>
-        </button>
-
-        {/* FAB Gasto (Rojo) */}
-        <button
-          onClick={() => setShowExpenseForm(true)}
-          className="bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center group"
-          aria-label="Agregar gasto"
-          title="Agregar Gasto"
-        >
-          <Minus className="w-6 h-6" />
-          <span className="absolute right-16 bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Agregar Gasto
-          </span>
-        </button>
-      </div>
-
-      {/* Modals */}
+      {/* Transaction Modals */}
       {showExpenseForm && <TransactionForm onClose={() => setShowExpenseForm(false)} />}
       {showContributionForm && <ContributionForm onClose={() => setShowContributionForm(false)} />}
     </div>
