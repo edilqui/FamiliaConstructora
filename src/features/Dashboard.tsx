@@ -391,14 +391,14 @@ export default function Dashboard() {
       </div>
 
       {/* --- FAB UNIFICADO --- */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-20 right-6 z-40 flex flex-col items-end gap-3">
         {isFabOpen && (
           <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
             <button 
               onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }}
               className="flex items-center gap-3 pr-1 group"
             >
-              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100 group-hover:opacity-100 transition-opacity">
                 Ingreso
               </span>
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center hover:bg-emerald-600 transition-colors">
@@ -409,7 +409,7 @@ export default function Dashboard() {
               onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }}
               className="flex items-center gap-3 pr-1 group"
             >
-              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100  group-hover:opacity-100 transition-opacity">
                 Gasto
               </span>
               <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors">

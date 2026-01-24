@@ -268,10 +268,10 @@ export default function CategoriesManager() {
       {/* --- FAB (Botón Flotante) --- */}
       <button
         onClick={handleOpenCreateForm}
-        className="fixed bottom-6 right-6 bg-gray-900 hover:bg-black text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+        className="fixed bottom-20 right-6 bg-gray-900 hover:bg-black text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
       >
         <Plus className="w-6 h-6" />
-        <span className="font-medium text-sm pr-1">Nueva</span>
+        <span className="font-medium text-sm pr-1">Nueva Categoría</span>
       </button>
 
       {/* --- MODAL (Bottom Sheet Style en móvil si se quisiera, aquí Centered Clean) --- */}

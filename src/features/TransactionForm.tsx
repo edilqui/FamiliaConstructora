@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet } from 'lucide-react';
+import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
@@ -10,26 +10,30 @@ import type { Transaction } from '../types';
 interface TransactionFormProps {
   onClose: () => void;
   defaultProjectId?: string;
-  transactionToEdit?: Transaction; // Nueva prop para edición
+  transactionToEdit?: Transaction;
 }
 
 export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
   const { projects, categories, totalInBox, users } = useDashboardData();
   const user = useAuthStore((state) => state.user);
-
   const isEditMode = !!transactionToEdit;
 
+  // Estados
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [categoryId, setCategoryId] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  
+  // FECHA Y HORA SEPARADAS
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [paymentSource, setPaymentSource] = useState<string>('caja'); // 'caja' o userId
+  const [time, setTime] = useState(format(new Date(), 'HH:mm'));
+
+  const [paymentSource, setPaymentSource] = useState<string>('caja');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Cargar datos si está en modo edición
+  // Cargar datos en edición
   useEffect(() => {
     if (transactionToEdit) {
       setProjectId(transactionToEdit.projectId || '');
@@ -37,21 +41,17 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       setAmount(transactionToEdit.amount.toString());
       setDescription(transactionToEdit.description);
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
+      setTime(format(transactionToEdit.date, 'HH:mm')); // Extraer hora existente
     }
   }, [transactionToEdit]);
 
-  // Log para depuración
-  console.log('📊 TransactionForm - Categorías recibidas:', categories.length, categories);
-
   const handleDelete = async () => {
     if (!transactionToEdit) return;
-
     setLoading(true);
     try {
       await deleteTransaction(transactionToEdit.id);
       onClose();
     } catch (err) {
-      console.error('Error al eliminar gasto:', err);
       setError('Error al eliminar. Intenta nuevamente.');
     } finally {
       setLoading(false);
@@ -63,31 +63,15 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     e.preventDefault();
     setError('');
 
-    if (!user) {
-      setError('Debes iniciar sesión');
-      return;
-    }
-
-    if (!projectId) {
-      setError('Selecciona un proyecto');
-      return;
-    }
-
-    if (!categoryId) {
-      setError('Selecciona una categoría');
-      return;
-    }
-
+    if (!user) return setError('Debes iniciar sesión');
+    if (!projectId) return setError('Selecciona un proyecto');
+    if (!categoryId) return setError('Selecciona una categoría');
+    
     const amountValue = parseFloat(amount);
-    if (!amount || amountValue <= 0) {
-      setError('Ingresa un monto válido');
-      return;
-    }
+    if (!amount || amountValue <= 0) return setError('Ingresa un monto válido');
 
-    // Validar saldo en caja solo si se paga desde caja (no si un usuario paga con sus recursos)
     if (!isEditMode && paymentSource === 'caja' && amountValue > totalInBox) {
-      setError(`No hay suficiente dinero en caja. Disponible: ${formatCurrency(totalInBox)}`);
-      return;
+      return setError(`Saldo insuficiente. Disponible: ${formatCurrency(totalInBox)}`);
     }
 
     setLoading(true);
@@ -96,12 +80,12 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       const selectedProject = projects.find(p => p.id === projectId);
       const selectedCategory = categories.find(c => c.id === categoryId);
 
-      // Crear fecha en zona horaria local para evitar problemas de UTC
+      // COMBINAR FECHA Y HORA
       const [year, month, day] = date.split('-').map(Number);
-      const transactionDate = new Date(year, month - 1, day, 12, 0, 0); // Mediodía local
+      const [hours, minutes] = time.split(':').map(Number);
+      const transactionDate = new Date(year, month - 1, day, hours, minutes);
 
       if (isEditMode && transactionToEdit) {
-        // Actualizar transacción existente
         await updateTransaction({
           id: transactionToEdit.id,
           amount: amountValue,
@@ -110,16 +94,14 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           projectId: projectId,
           categoryId: categoryId,
           categoryName: selectedCategory?.name || 'Sin categoría',
-          userId: transactionToEdit.userId, // Mantener el usuario original
+          userId: transactionToEdit.userId,
           description: description || `Gasto en ${selectedProject?.name}`,
           date: transactionDate,
         });
       } else {
-        // Si un usuario paga con sus recursos, crear dos transacciones
         if (paymentSource !== 'caja') {
           const payingUser = users.find(u => u.id === paymentSource);
-
-          // 1. Registrar el aporte del usuario
+          // 1. Aporte
           await addTransaction({
             amount: amountValue,
             project: 'Aporte',
@@ -129,11 +111,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             categoryName: 'N/A',
             userId: paymentSource,
             registeredBy: user.id,
-            description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo de gasto)`,
+            description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo)`,
             date: transactionDate,
           });
-
-          // 2. Registrar el gasto desde caja
+          // 2. Gasto
           await addTransaction({
             amount: amountValue,
             project: selectedProject?.name || 'Gasto',
@@ -143,11 +124,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             categoryName: selectedCategory?.name || 'Sin categoría',
             userId: user.id,
             registeredBy: user.id,
-            description: description || `Gasto en ${selectedProject?.name} (pagado por ${payingUser?.name})`,
+            description: description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`,
             date: transactionDate,
           });
         } else {
-          // Pago normal desde caja
           await addTransaction({
             amount: amountValue,
             project: selectedProject?.name || 'Gasto',
@@ -162,10 +142,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           });
         }
       }
-
       onClose();
     } catch (err) {
-      console.error('Error al guardar gasto:', err);
       setError('Error al guardar. Intenta nuevamente.');
     } finally {
       setLoading(false);
@@ -173,294 +151,216 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
+
+      {/* Modal Content */}
+      <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+        
+        {/* Drag Handle (Mobile only visual cue) */}
+        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
+
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b bg-red-50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500 rounded-full">
-              <Receipt className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">
-              {isEditMode ? 'Editar Gasto' : 'Registrar Gasto'}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {isEditMode && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="p-2 hover:bg-red-100 rounded-full transition-colors text-red-600"
-                aria-label="Eliminar"
-                title="Eliminar gasto"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              aria-label="Cerrar"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900">
+            {isEditMode ? 'Editar Gasto' : 'Registrar Gastoss'}
+          </h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* Error */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          
+          {/* Alerta de Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="bg-red-50 text-red-600 text-sm p-4 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p>{error}</p>
             </div>
           )}
 
-          {/* Saldo disponible */}
-          {!isEditMode && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Disponible en caja:</strong> {formatCurrency(totalInBox)}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                {paymentSource === 'caja'
-                  ? 'Este gasto se restará del total en caja'
-                  : 'Se registrará un aporte automático y luego el gasto'}
-              </p>
-            </div>
-          )}
-
-          {/* Proyecto */}
+          {/* MONTO (Input Gigante) */}
           <div>
-            <label htmlFor="project" className="block text-sm font-medium text-gray-700 mb-2">
-              Proyecto
-            </label>
-            <select
-              id="project"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              required
-            >
-              <option value="">Seleccionar proyecto...</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Fuente de Pago - Solo en modo crear */}
-          {!isEditMode && (
-            <div>
-              <label htmlFor="paymentSource" className="block text-sm font-medium text-gray-700 mb-2">
-                <div className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4" />
-                  ¿De dónde sale el pago?
-                </div>
-              </label>
-              <select
-                id="paymentSource"
-                value={paymentSource}
-                onChange={(e) => setPaymentSource(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                required
-              >
-                <option value="caja">💰 Desde Caja (dinero disponible)</option>
-                <optgroup label="👤 Pago directo de un hermano">
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} {u.id === user?.id ? '(Yo)' : ''} - Paga con sus recursos
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-              {paymentSource === 'caja' ? (
-                <p className="text-xs text-gray-500 mt-2">
-                  💡 El gasto se descontará de la caja común
-                </p>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
-                  <p className="text-xs text-green-800">
-                    <strong>✓ Doble registro automático:</strong>
-                  </p>
-                  <ul className="text-xs text-green-700 mt-1 ml-4 list-disc space-y-0.5">
-                    <li>Se registrará un aporte de {users.find(u => u.id === paymentSource)?.name || 'este hermano'}</li>
-                    <li>Se registrará el gasto desde caja</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Categoría */}
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-              Categoría del Gasto
-            </label>
-            <select
-              id="category"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              required
-            >
-              <option value="">Seleccionar categoría...</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Monto */}
-          <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Monto del Gasto
-            </label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Monto</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400">$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
               <input
-                id="amount"
                 type="number"
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-10 pr-4 py-4 text-2xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-gray-50 border-2 border-transparent focus:border-red-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
                 required
+                autoFocus={!isEditMode}
               />
+            </div>
+            {!isEditMode && paymentSource === 'caja' && (
+              <p className="text-xs text-gray-400 mt-2 text-right">
+                Disponible: <span className="font-semibold text-gray-600">{formatCurrency(totalInBox)}</span>
+              </p>
+            )}
+          </div>
+
+          {/* SELECTORES (Proyecto y Categoría) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Proyecto</label>
+              <div className="relative">
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all font-medium"
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Categoría</label>
+              <div className="relative">
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all font-medium"
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
 
-          {/* Descripción */}
+          {/* FUENTE DE PAGO (Solo Crear) */}
+          {!isEditMode && (
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+               <label className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2 block flex items-center gap-1">
+                 <Wallet className="w-3 h-3" /> Método de Pago
+               </label>
+               <div className="relative">
+                  <select
+                    value={paymentSource}
+                    onChange={(e) => setPaymentSource(e.target.value)}
+                    className="w-full appearance-none bg-white border border-blue-200 text-blue-900 text-sm rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 outline-none font-medium shadow-sm"
+                  >
+                    <option value="caja">Caja Común (Efectivo disponible)</option>
+                    <optgroup label="Pago directo (Aporte automático)">
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} {u.id === user?.id ? '(Yo)' : ''} paga de su bolsillo
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+               </div>
+            </div>
+          )}
+
+          {/* DESCRIPCIÓN */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Descripción del Gasto (Opcional)
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Nota / Detalle</label>
             <textarea
-              id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Compra de cerámica, Pago de mano de obra..."
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              placeholder="Ej: Materiales para el baño..."
+              rows={2}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:bg-white outline-none transition-all resize-none"
             />
           </div>
 
-          {/* Fecha */}
-          <div>
-            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha del Gasto
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-              <input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                max={format(new Date(), 'yyyy-MM-dd')}
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                required
-              />
+          {/* FECHA Y HORA (GRID) */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Fecha</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                  className="w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-red-500 focus:bg-white outline-none"
+                  required
+                />
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Fecha en que se realizó el gasto
-            </p>
+            
+            <div className="col-span-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Hora</label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full pl-9 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-red-500 focus:bg-white outline-none"
+                  required
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Botones */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-              disabled={loading}
-            >
-              Cancelar
-            </button>
+          {/* BOTONES DE ACCIÓN */}
+          <div className="pt-2 flex flex-col gap-3">
             <button
               type="submit"
               disabled={loading}
-              className={cn(
-                'flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2',
-                loading && 'opacity-50 cursor-not-allowed'
-              )}
+              className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                isEditMode ? 'Actualizar Gasto' : 'Registrar Gasto'
-              )}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Receipt className="w-5 h-5" />}
+              {isEditMode ? 'Guardar Cambios' : 'Registrar Gasto'}
             </button>
+
+            {isEditMode && (
+               <button
+                 type="button"
+                 onClick={() => setShowDeleteConfirm(true)}
+                 className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+               >
+                 <Trash2 className="w-4 h-4" /> Eliminar este gasto
+               </button>
+            )}
           </div>
         </form>
-      </div>
 
-      {/* Modal de Confirmación de Eliminación */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
+        {/* --- MODAL CONFIRMACIÓN BORRADO (NESTED) --- */}
+        {showDeleteConfirm && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-20 flex items-center justify-center p-6 rounded-3xl animate-in fade-in">
+            <div className="text-center space-y-4 max-w-xs">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <Trash2 className="w-8 h-8 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Confirmar Eliminación</h3>
-            </div>
-
-            <p className="text-gray-700 mb-2">
-              ¿Estás seguro de que deseas eliminar este gasto?
-            </p>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-yellow-800">
-                <strong>⚠️ Advertencia:</strong> Esta acción es irreversible. Se actualizarán automáticamente:
+              <h3 className="text-xl font-bold text-gray-900">¿Eliminar gasto?</h3>
+              <p className="text-sm text-gray-500">
+                Esta acción afectará los balances de caja y reportes del proyecto. No se puede deshacer.
               </p>
-              <ul className="text-xs text-yellow-700 mt-2 ml-4 list-disc space-y-1">
-                <li>Total en caja</li>
-                <li>Balance de todos los hermanos</li>
-                <li>Estadísticas del proyecto</li>
-                <li>Todos los gráficos y reportes</li>
-              </ul>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                disabled={loading}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className={cn(
-                  'flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2',
-                  loading && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-5 h-5" />
-                    Eliminar
-                  </>
-                )}
-              </button>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200"
+                >
+                  Sí, eliminar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
