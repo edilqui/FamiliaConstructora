@@ -79,20 +79,23 @@ export default function Dashboard() {
 
   // Cálculo de progreso de aportes por usuario basado en presupuestos
   const userContributionProgress = useMemo(() => {
-    // Sumar todos los presupuestos de todos los proyectos
-    const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
+    // Calcular presupuesto efectivo por proyecto
+    // Si un proyecto tiene budget = 0, usar la suma de sus gastos
+    const effectiveBudgetTotal = projects.reduce((sum, project) => {
+      if (project.budget > 0) {
+        return sum + project.budget;
+      } else {
+        // Si no tiene presupuesto, usar suma de gastos de ese proyecto
+        const projectExpenses = transactions
+          .filter(t => t.type === 'expense' && t.projectId === project.id)
+          .reduce((expSum, t) => expSum + t.amount, 0);
+        return sum + projectExpenses;
+      }
+    }, 0);
 
-    // Calcular total de gastos desde transactions
-    const totalExpenses = transactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Si no hay presupuesto definido, usar total de gastos como referencia
-    const referenceTotal = totalBudget > 0 ? totalBudget : totalExpenses;
-
-    // Calcular cuánto le corresponde a cada usuario (25% si son 4 usuarios)
+    // Calcular cuánto le corresponde a cada usuario (dividir equitativamente)
     const numberOfUsers = userStats.length || 4;
-    const expectedPerUser = referenceTotal / numberOfUsers;
+    const expectedPerUser = effectiveBudgetTotal / numberOfUsers;
 
     return userStats.map(stats => {
       const contributed = stats.totalContributed;
@@ -268,9 +271,14 @@ export default function Dashboard() {
                 <div>
                   <h3 className="font-bold text-gray-800 text-sm">Progreso de Aportes</h3>
                   <p className="text-[10px] text-gray-400 font-medium">
-                    Basado en presupuestos totales ({formatCurrency(
-                      projects.reduce((s, p) => s + (p.budget || 0), 0) ||
-                      transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+                    Basado en presupuestos ({formatCurrency(
+                      projects.reduce((sum, project) => {
+                        if (project.budget > 0) return sum + project.budget;
+                        const projectExpenses = transactions
+                          .filter(t => t.type === 'expense' && t.projectId === project.id)
+                          .reduce((expSum, t) => expSum + t.amount, 0);
+                        return sum + projectExpenses;
+                      }, 0)
                     )})
                   </p>
                 </div>

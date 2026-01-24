@@ -12,7 +12,7 @@ import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
 
 export default function Balance() {
-  const { userStats, transactions, totalExpenses, totalInBox } = useDashboardData();
+  const { userStats, transactions, totalExpenses, totalInBox, projects } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
   // Estado simple para simular la UI de búsqueda (listo para conectar tu lógica)
@@ -47,6 +47,39 @@ export default function Balance() {
     if (!currentUserStats) return 0;
     return currentUserStats.balance < 0 ? Math.abs(currentUserStats.balance) : 0;
   }, [currentUserStats]);
+
+  // Calcular presupuesto efectivo total (considerando gastos si budget = 0)
+  const effectiveBudgetTotal = useMemo(() => {
+    return projects.reduce((sum, project) => {
+      if (project.budget > 0) {
+        return sum + project.budget;
+      } else {
+        // Si no tiene presupuesto, usar suma de gastos de ese proyecto
+        const projectExpenses = transactions
+          .filter(t => t.type === 'expense' && t.projectId === project.id)
+          .reduce((expSum, t) => expSum + t.amount, 0);
+        return sum + projectExpenses;
+      }
+    }, 0);
+  }, [projects, transactions]);
+
+  // Calcular cuánto le corresponde a cada usuario
+  const expectedContribution = useMemo(() => {
+    const numberOfUsers = userStats.length || 4;
+    return effectiveBudgetTotal / numberOfUsers;
+  }, [effectiveBudgetTotal, userStats.length]);
+
+  // Cuánto falta por aportar para llegar a la meta
+  const remainingToGoal = useMemo(() => {
+    if (!currentUserStats) return 0;
+    return Math.max(0, expectedContribution - currentUserStats.totalContributed);
+  }, [expectedContribution, currentUserStats]);
+
+  // Porcentaje de progreso hacia la meta
+  const progressPercentage = useMemo(() => {
+    if (!currentUserStats || expectedContribution === 0) return 0;
+    return Math.min(100, (currentUserStats.totalContributed / expectedContribution) * 100);
+  }, [currentUserStats, expectedContribution]);
 
   const recommendedContribution = useMemo(() => {
     if (amountToCatchUp === 0) return 0;
@@ -149,6 +182,72 @@ export default function Balance() {
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.share)}</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* --- PROGRESO HACIA META DE PRESUPUESTOS --- */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-800">Meta de Aportes</h3>
+              <p className="text-xs text-gray-500">Basado en presupuestos totales</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Tu meta esperada:</span>
+              <span className="text-lg font-bold text-gray-900">{formatCurrency(expectedContribution)}</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Has aportado:</span>
+              <span className="text-lg font-bold text-blue-600">{formatCurrency(currentUserStats?.totalContributed || 0)}</span>
+            </div>
+
+            {remainingToGoal > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-sm font-medium text-gray-600">Te falta aportar:</span>
+                <span className="text-lg font-bold text-amber-600">{formatCurrency(remainingToGoal)}</span>
+              </div>
+            )}
+
+            {/* Barra de progreso */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">Progreso</span>
+                <span className={cn(
+                  "text-sm font-bold",
+                  progressPercentage >= 100 ? "text-emerald-600" :
+                  progressPercentage >= 50 ? "text-blue-600" : "text-amber-600"
+                )}>
+                  {progressPercentage.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full transition-all duration-500",
+                    progressPercentage >= 100 ? "bg-gradient-to-r from-emerald-500 to-emerald-600" :
+                    progressPercentage >= 50 ? "bg-gradient-to-r from-blue-500 to-blue-600" :
+                    "bg-gradient-to-r from-amber-500 to-amber-600"
+                  )}
+                  style={{ width: `${Math.min(100, progressPercentage)}%` }}
+                />
+              </div>
+            </div>
+
+            {progressPercentage >= 100 && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                <p className="text-xs text-emerald-700 font-medium">
+                  ¡Excelente! Has cumplido tu meta de aportes
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
