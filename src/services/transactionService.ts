@@ -12,10 +12,11 @@ interface AddTransactionParams {
   userId: string; // Usuario que hace el aporte o gasto
   registeredBy: string; // Usuario que registra la transacción
   description: string;
+  date?: Date; // Fecha opcional, si no se proporciona usa la fecha actual
 }
 
 export const addTransaction = async (params: AddTransactionParams): Promise<void> => {
-  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, description } = params;
+  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, description, date } = params;
 
   try {
     const transactionsRef = collection(db, 'transactions');
@@ -30,7 +31,7 @@ export const addTransaction = async (params: AddTransactionParams): Promise<void
       userId,
       registeredBy,
       description,
-      date: new Date(),
+      date: date || new Date(), // Usa la fecha proporcionada o la fecha actual
       createdAt: serverTimestamp(),
     });
 

@@ -1,9 +1,10 @@
 import { useState, FormEvent } from 'react';
-import { X, Loader2, DollarSign } from 'lucide-react';
+import { X, Loader2, DollarSign, Calendar } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction } from '../services/transactionService';
 import { cn } from '../lib/utils';
+import { format } from 'date-fns';
 
 interface ContributionFormProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ export default function ContributionForm({ onClose }: ContributionFormProps) {
   const [userId, setUserId] = useState(currentUser?.id || '');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,6 +53,7 @@ export default function ContributionForm({ onClose }: ContributionFormProps) {
         userId: userId,
         registeredBy: currentUser.id,
         description: description || `Aporte de ${users.find(u => u.id === userId)?.name || 'usuario'}`,
+        date: new Date(date), // Convierte el string de fecha a objeto Date
       });
 
       onClose();
@@ -148,6 +151,28 @@ export default function ContributionForm({ onClose }: ContributionFormProps) {
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
+          </div>
+
+          {/* Fecha */}
+          <div>
+            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha del Aporte
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              <input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Fecha en que se realizó el aporte
+            </p>
           </div>
 
           {/* Información */}
