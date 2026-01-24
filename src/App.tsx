@@ -4,6 +4,11 @@ import { useAuthStore } from './store/useAuthStore';
 import Layout from './components/Layout';
 import Dashboard from './features/Dashboard';
 import Statistics from './features/Statistics';
+import Expenses from './features/Expenses';
+import Balance from './features/Balance';
+import Settings from './features/Settings';
+import CategoriesManager from './features/CategoriesManager';
+import ProjectsManager from './features/ProjectsManager';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
 
@@ -55,11 +60,61 @@ function App() {
           }
         />
         <Route
+          path="/expenses"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Expenses />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/balance"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Balance />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/statistics"
           element={
             <ProtectedRoute>
               <Layout>
                 <Statistics />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Settings />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/categories"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CategoriesManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/projects"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectsManager />
               </Layout>
             </ProtectedRoute>
           }
