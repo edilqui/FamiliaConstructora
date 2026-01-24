@@ -17,9 +17,20 @@ export default function ProjectExpenses() {
 
   // Estados
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  const handleEditTransaction = (transaction: typeof transactions[0]) => {
+    setTransactionToEdit(transaction);
+    setShowExpenseForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowExpenseForm(false);
+    setTransactionToEdit(undefined);
+  };
 
   // Encontrar el proyecto actual
   const currentProject = useMemo(() => {
@@ -185,7 +196,11 @@ export default function ProjectExpenses() {
                   
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
                     {groupItems.map((t) => (
-                      <div key={t.id} className="p-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <button
+                        key={t.id}
+                        onClick={() => handleEditTransaction(t)}
+                        className="w-full p-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                      >
                         <div className="flex items-center gap-3 overflow-hidden">
                           {/* Icono de Categoría */}
                           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0 text-red-600">
@@ -214,7 +229,7 @@ export default function ProjectExpenses() {
                             -{formatCurrency(t.amount)}
                           </p>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -235,8 +250,9 @@ export default function ProjectExpenses() {
       {/* --- MODAL FORM --- */}
       {showExpenseForm && (
         <TransactionForm
-          onClose={() => setShowExpenseForm(false)}
+          onClose={handleCloseForm}
           defaultProjectId={projectId} // Preselecciona este proyecto
+          transactionToEdit={transactionToEdit}
         />
       )}
     </div>

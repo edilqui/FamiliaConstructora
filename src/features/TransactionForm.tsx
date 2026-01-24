@@ -1,19 +1,23 @@
-import { useState, FormEvent } from 'react';
-import { X, Loader2, Receipt, Calendar } from 'lucide-react';
+import { useState, FormEvent, useEffect } from 'react';
+import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
-import { addTransaction } from '../services/transactionService';
+import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
+import type { Transaction } from '../types';
 
 interface TransactionFormProps {
   onClose: () => void;
   defaultProjectId?: string;
+  transactionToEdit?: Transaction; // Nueva prop para edición
 }
 
-export default function TransactionForm({ onClose, defaultProjectId }: TransactionFormProps) {
+export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
   const { projects, categories, totalInBox } = useDashboardData();
   const user = useAuthStore((state) => state.user);
+
+  const isEditMode = !!transactionToEdit;
 
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [categoryId, setCategoryId] = useState<string>('');
@@ -22,9 +26,37 @@ export default function TransactionForm({ onClose, defaultProjectId }: Transacti
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Cargar datos si está en modo edición
+  useEffect(() => {
+    if (transactionToEdit) {
+      setProjectId(transactionToEdit.projectId || '');
+      setCategoryId(transactionToEdit.categoryId || '');
+      setAmount(transactionToEdit.amount.toString());
+      setDescription(transactionToEdit.description);
+      setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
+    }
+  }, [transactionToEdit]);
 
   // Log para depuración
   console.log('📊 TransactionForm - Categorías recibidas:', categories.length, categories);
+
+  const handleDelete = async () => {
+    if (!transactionToEdit) return;
+
+    setLoading(true);
+    try {
+      await deleteTransaction(transactionToEdit.id);
+      onClose();
+    } catch (err) {
+      console.error('Error al eliminar gasto:', err);
+      setError('Error al eliminar. Intenta nuevamente.');
+    } finally {
+      setLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,8 +83,8 @@ export default function TransactionForm({ onClose, defaultProjectId }: Transacti
       return;
     }
 
-    // Validar que hay suficiente dinero en caja
-    if (amountValue > totalInBox) {
+    // Validar que hay suficiente dinero en caja (solo al crear, no al editar)
+    if (!isEditMode && amountValue > totalInBox) {
       setError(`No hay suficiente dinero en caja. Disponible: ${formatCurrency(totalInBox)}`);
       return;
     }
@@ -63,22 +95,39 @@ export default function TransactionForm({ onClose, defaultProjectId }: Transacti
       const selectedProject = projects.find(p => p.id === projectId);
       const selectedCategory = categories.find(c => c.id === categoryId);
 
-      await addTransaction({
-        amount: amountValue,
-        project: selectedProject?.name || 'Gasto',
-        type: 'expense',
-        projectId: projectId,
-        categoryId: categoryId,
-        categoryName: selectedCategory?.name || 'Sin categoría',
-        userId: user.id,
-        registeredBy: user.id,
-        description: description || `Gasto en ${selectedProject?.name}`,
-        date: new Date(date), // Convierte el string de fecha a objeto Date
-      });
+      if (isEditMode && transactionToEdit) {
+        // Actualizar transacción existente
+        await updateTransaction({
+          id: transactionToEdit.id,
+          amount: amountValue,
+          project: selectedProject?.name || 'Gasto',
+          type: 'expense',
+          projectId: projectId,
+          categoryId: categoryId,
+          categoryName: selectedCategory?.name || 'Sin categoría',
+          userId: transactionToEdit.userId, // Mantener el usuario original
+          description: description || `Gasto en ${selectedProject?.name}`,
+          date: new Date(date),
+        });
+      } else {
+        // Crear nueva transacción
+        await addTransaction({
+          amount: amountValue,
+          project: selectedProject?.name || 'Gasto',
+          type: 'expense',
+          projectId: projectId,
+          categoryId: categoryId,
+          categoryName: selectedCategory?.name || 'Sin categoría',
+          userId: user.id,
+          registeredBy: user.id,
+          description: description || `Gasto en ${selectedProject?.name}`,
+          date: new Date(date),
+        });
+      }
 
       onClose();
     } catch (err) {
-      console.error('Error al crear gasto:', err);
+      console.error('Error al guardar gasto:', err);
       setError('Error al guardar. Intenta nuevamente.');
     } finally {
       setLoading(false);
@@ -94,15 +143,29 @@ export default function TransactionForm({ onClose, defaultProjectId }: Transacti
             <div className="p-2 bg-red-500 rounded-full">
               <Receipt className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">Registrar Gasto</h2>
+            <h2 className="text-xl font-bold text-gray-800">
+              {isEditMode ? 'Editar Gasto' : 'Registrar Gasto'}
+            </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isEditMode && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-2 hover:bg-red-100 rounded-full transition-colors text-red-600"
+                aria-label="Eliminar"
+                title="Eliminar gasto"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Form */}
@@ -248,12 +311,72 @@ export default function TransactionForm({ onClose, defaultProjectId }: Transacti
                   Guardando...
                 </>
               ) : (
-                'Registrar Gasto'
+                isEditMode ? 'Actualizar Gasto' : 'Registrar Gasto'
               )}
             </button>
           </div>
         </form>
       </div>
+
+      {/* Modal de Confirmación de Eliminación */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Confirmar Eliminación</h3>
+            </div>
+
+            <p className="text-gray-700 mb-2">
+              ¿Estás seguro de que deseas eliminar este gasto?
+            </p>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-yellow-800">
+                <strong>⚠️ Advertencia:</strong> Esta acción es irreversible. Se actualizarán automáticamente:
+              </p>
+              <ul className="text-xs text-yellow-700 mt-2 ml-4 list-disc space-y-1">
+                <li>Total en caja</li>
+                <li>Balance de todos los hermanos</li>
+                <li>Estadísticas del proyecto</li>
+                <li>Todos los gráficos y reportes</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                disabled={loading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className={cn(
+                  'flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2',
+                  loading && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    Eliminar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

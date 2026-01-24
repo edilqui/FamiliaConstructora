@@ -18,9 +18,29 @@ export default function Expenses() {
   // Estados
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  
+  const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
+
   // Estado para menú de acciones flotante (FAB expandible)
   const [isFabOpen, setIsFabOpen] = useState(false);
+
+  const handleEditTransaction = (transaction: typeof transactions[0]) => {
+    setTransactionToEdit(transaction);
+    if (transaction.type === 'expense') {
+      setShowExpenseForm(true);
+    } else {
+      setShowContributionForm(true);
+    }
+  };
+
+  const handleCloseExpenseForm = () => {
+    setShowExpenseForm(false);
+    setTransactionToEdit(undefined);
+  };
+
+  const handleCloseContributionForm = () => {
+    setShowContributionForm(false);
+    setTransactionToEdit(undefined);
+  };
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -200,7 +220,11 @@ export default function Expenses() {
                   {groupItems.map((t) => {
                     const isExpense = t.type === 'expense';
                     return (
-                      <div key={t.id} className="p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                      <button
+                        key={t.id}
+                        onClick={() => handleEditTransaction(t)}
+                        className="w-full p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                      >
                         {/* Icono */}
                         <div className={cn(
                           "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
@@ -237,7 +261,7 @@ export default function Expenses() {
                             {format(t.date, 'HH:mm')}
                           </p>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -289,8 +313,18 @@ export default function Expenses() {
       </div>
 
       {/* Modales */}
-      {showContributionForm && <ContributionForm onClose={() => setShowContributionForm(false)} />}
-      {showExpenseForm && <TransactionForm onClose={() => setShowExpenseForm(false)} />}
+      {showContributionForm && (
+        <ContributionForm
+          onClose={handleCloseContributionForm}
+          transactionToEdit={transactionToEdit?.type === 'contribution' ? transactionToEdit : undefined}
+        />
+      )}
+      {showExpenseForm && (
+        <TransactionForm
+          onClose={handleCloseExpenseForm}
+          transactionToEdit={transactionToEdit?.type === 'expense' ? transactionToEdit : undefined}
+        />
+      )}
     </div>
   );
 }

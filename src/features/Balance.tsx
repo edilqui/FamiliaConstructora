@@ -1,21 +1,34 @@
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
-import { 
-  Scale, TrendingUp, TrendingDown, User, 
-  DollarSign, AlertCircle, CheckCircle2, 
-  Wallet, History, Search, Filter 
+import {
+  Scale, TrendingUp, TrendingDown, User,
+  DollarSign, AlertCircle, CheckCircle2,
+  Wallet, History, Search, Filter
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import ContributionForm from './ContributionForm';
 
 export default function Balance() {
   const { userStats, transactions, totalExpenses, totalInBox } = useDashboardData();
   const user = useAuthStore((state) => state.user);
-  
+
   // Estado simple para simular la UI de búsqueda (listo para conectar tu lógica)
   const [searchTerm, setSearchTerm] = useState('');
+  const [showContributionForm, setShowContributionForm] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
+
+  const handleEditContribution = (contribution: typeof transactions[0]) => {
+    setTransactionToEdit(contribution);
+    setShowContributionForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowContributionForm(false);
+    setTransactionToEdit(undefined);
+  };
 
   // --- LÓGICA ORIGINAL (INTACTA) ---
   const currentUserStats = useMemo(() => {
@@ -254,9 +267,10 @@ export default function Balance() {
               </div>
             ) : (
               userContributions.map((contribution) => (
-                <div 
+                <button
                   key={contribution.id}
-                  className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between"
+                  onClick={() => handleEditContribution(contribution)}
+                  className="w-full bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-50 rounded-lg text-green-600">
@@ -272,12 +286,20 @@ export default function Balance() {
                   <span className="font-bold text-emerald-600 text-sm">
                     +{formatCurrency(contribution.amount)}
                   </span>
-                </div>
+                </button>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Modal de edición de contribución */}
+      {showContributionForm && (
+        <ContributionForm
+          onClose={handleCloseForm}
+          transactionToEdit={transactionToEdit}
+        />
+      )}
     </div>
   );
 }
