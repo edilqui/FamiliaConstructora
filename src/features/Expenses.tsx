@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
-import { Search, Filter, Plus, Minus, ArrowUpCircle, ArrowDownCircle, Calendar, Trash2 } from 'lucide-react';
+import { 
+  Search, Filter, Plus, Minus, ArrowUpCircle, ArrowDownCircle, 
+  Calendar, Trash2, X, ChevronDown, Wallet
+} from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -12,289 +15,276 @@ export default function Expenses() {
   const { transactions, projects, categories, totalContributions, totalExpenses } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
-  // Estados para modales
+  // Estados
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  
+  // Estado para menú de acciones flotante (FAB expandible)
+  const [isFabOpen, setIsFabOpen] = useState(false);
 
-  // Estados para filtros
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'contribution' | 'expense'>('all');
   const [filterProject, setFilterProject] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filtrar y ordenar transacciones
+  // --- LÓGICA DE FILTRADO (INTACTA) ---
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
 
-    // Filtro por tipo
-    if (filterType !== 'all') {
-      filtered = filtered.filter((t) => t.type === filterType);
-    }
-
-    // Filtro por proyecto
-    if (filterProject !== 'all') {
-      filtered = filtered.filter((t) => t.projectId === filterProject);
-    }
-
-    // Filtro por categoría (solo para gastos)
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter((t) => t.categoryId === filterCategory);
-    }
-
-    // Búsqueda por descripción
+    if (filterType !== 'all') filtered = filtered.filter((t) => t.type === filterType);
+    if (filterProject !== 'all') filtered = filtered.filter((t) => t.projectId === filterProject);
+    if (filterCategory !== 'all') filtered = filtered.filter((t) => t.categoryId === filterCategory);
+    
     if (searchTerm) {
       filtered = filtered.filter((t) =>
         t.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Ordenar por fecha (más reciente primero)
     filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
-
     return filtered;
   }, [transactions, filterType, filterProject, filterCategory, searchTerm]);
 
-  // Calcular totales filtrados
   const filteredStats = useMemo(() => {
     const contributions = filteredTransactions
       .filter((t) => t.type === 'contribution')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0); // Fix NaN
     const expenses = filteredTransactions
       .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0); // Fix NaN
     return { contributions, expenses };
   }, [filteredTransactions]);
 
   const hasActiveFilters = filterType !== 'all' || filterProject !== 'all' || filterCategory !== 'all' || searchTerm !== '';
 
+  // Agrupar transacciones por fecha (Estilo agenda)
+  const groupedTransactions = useMemo(() => {
+    const groups: { [key: string]: typeof filteredTransactions } = {};
+    filteredTransactions.forEach(t => {
+      const dateKey = format(t.date, 'yyyy-MM-dd');
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(t);
+    });
+    return groups;
+  }, [filteredTransactions]);
+
   return (
-    <div className="space-y-4 pb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Historial</h1>
-          <p className="text-sm text-gray-600">Gastos y aportes registrados</p>
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      
+      {/* --- HEADER STICKY --- */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-bold text-gray-900">Historial</h1>
+          
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              "p-2 rounded-full transition-colors relative",
+              hasActiveFilters ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"
+            )}
+          >
+            <Filter className="w-5 h-5" />
+            {hasActiveFilters && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* Totales */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ArrowUpCircle className="w-5 h-5 text-green-600" />
-            <span className="text-xs font-medium text-green-700">Aportes</span>
-          </div>
-          <p className="text-2xl font-bold text-green-700">
-            {formatCurrency(hasActiveFilters ? filteredStats.contributions : totalContributions)}
-          </p>
+        {/* Buscador Integrado */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar gasto o aporte..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-100 text-sm py-2.5 pl-9 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-gray-400"
+          />
         </div>
 
-        <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ArrowDownCircle className="w-5 h-5 text-red-600" />
-            <span className="text-xs font-medium text-red-700">Gastos</span>
-          </div>
-          <p className="text-2xl font-bold text-red-700">
-            {formatCurrency(hasActiveFilters ? filteredStats.expenses : totalExpenses)}
-          </p>
-        </div>
-      </div>
-
-      {/* Búsqueda */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar por descripción..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-      </div>
-
-      {/* Botón de Filtros */}
-      <button
-        onClick={() => setShowFilters(!showFilters)}
-        className={cn(
-          'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition-colors',
-          showFilters || hasActiveFilters
-            ? 'bg-primary-50 border-primary-500 text-primary-700'
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-        )}
-      >
-        <Filter className="w-5 h-5" />
-        <span className="font-medium">
-          Filtros {hasActiveFilters && `(${filteredTransactions.length})`}
-        </span>
-      </button>
-
-      {/* Panel de Filtros */}
-      {showFilters && (
-        <div className="bg-white border-2 border-gray-200 rounded-lg p-4 space-y-4">
-          {/* Filtro por Tipo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">Todos</option>
-              <option value="contribution">Solo Aportes</option>
-              <option value="expense">Solo Gastos</option>
-            </select>
-          </div>
-
-          {/* Filtro por Proyecto */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Proyecto</label>
-            <select
-              value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">Todos los proyectos</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filtro por Categoría (solo visible si no está filtrando solo aportes) */}
-          {filterType !== 'contribution' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
+        {/* Panel de Filtros Expandible */}
+        {showFilters && (
+          <div className="mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Todos los tipos</option>
+                <option value="contribution">Solo Ingresos</option>
+                <option value="expense">Solo Gastos</option>
+              </select>
+              <select
+                value={filterProject}
+                onChange={(e) => setFilterProject(e.target.value)}
+                className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Todos los proy.</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            
+            {filterType !== 'contribution' && (
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 mb-2 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todas las categorías</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            )}
+
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setFilterType('all'); setFilterProject('all'); setFilterCategory('all'); setSearchTerm('');
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg mt-1"
+              >
+                <Trash2 className="w-3 h-3" /> Limpiar todo
+              </button>
+            )}
+          </div>
+        )}
+      </header>
+
+      <div className="px-4 pt-4 max-w-lg mx-auto">
+        
+        {/* --- WIDGETS DE RESUMEN --- */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-10">
+              <ArrowUpCircle className="w-12 h-12 text-emerald-600" />
             </div>
-          )}
-
-          {/* Botón Limpiar Filtros */}
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setFilterType('all');
-                setFilterProject('all');
-                setFilterCategory('all');
-                setSearchTerm('');
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Limpiar filtros
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Lista de Transacciones */}
-      <div className="space-y-3">
-        {filteredTransactions.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">
-              {hasActiveFilters ? 'No hay transacciones que coincidan con los filtros' : 'No hay transacciones registradas'}
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Total Aportes</p>
+            <p className="text-xl font-bold text-emerald-800">
+              {formatCurrency((hasActiveFilters ? filteredStats.contributions : totalContributions) || 0)}
             </p>
           </div>
-        ) : (
-          filteredTransactions.map((transaction) => {
-            const isExpense = transaction.type === 'expense';
-            return (
-              <div
-                key={transaction.id}
-                className={cn(
-                  'bg-white border-2 rounded-lg p-4 shadow-sm transition-all hover:shadow-md',
-                  isExpense ? 'border-red-200' : 'border-green-200'
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    {/* Tipo y Fecha */}
-                    <div className="flex items-center gap-2 mb-2">
-                      {isExpense ? (
-                        <ArrowDownCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                      ) : (
-                        <ArrowUpCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      )}
-                      <span className="text-xs text-gray-500">
-                        {format(transaction.date, "d 'de' MMMM, yyyy • HH:mm", { locale: es })}
-                      </span>
-                    </div>
 
-                    {/* Descripción */}
-                    <p className="font-medium text-gray-800 mb-2">{transaction.description}</p>
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-3 opacity-10">
+              <ArrowDownCircle className="w-12 h-12 text-red-600" />
+            </div>
+            <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Total Gastos</p>
+            <p className="text-xl font-bold text-red-800">
+              {formatCurrency((hasActiveFilters ? filteredStats.expenses : totalExpenses) || 0)}
+            </p>
+          </div>
+        </div>
 
-                    {/* Detalles */}
-                    <div className="space-y-1">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Proyecto:</span> {transaction.project}
-                      </p>
-                      {isExpense && transaction.categoryName !== 'N/A' && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">Categoría:</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                            {transaction.categoryName}
-                          </span>
+        {/* --- LISTA DE TRANSACCIONES --- */}
+        <div className="space-y-6">
+          {Object.keys(groupedTransactions).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center opacity-60">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                <Search className="w-6 h-6 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-sm">No se encontraron movimientos</p>
+            </div>
+          ) : (
+            // Renderizado por Grupos de Fecha
+            Object.entries(groupedTransactions)
+              .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+              .map(([dateKey, groupItems]) => (
+              <div key={dateKey}>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sticky top-28 ml-1">
+                  {format(new Date(dateKey), "EEEE, d 'de' MMMM", { locale: es })}
+                </h3>
+                
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+                  {groupItems.map((t) => {
+                    const isExpense = t.type === 'expense';
+                    return (
+                      <div key={t.id} className="p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                        {/* Icono */}
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                          isExpense ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
+                        )}>
+                          {isExpense ? <ArrowDownCircle className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Monto */}
-                  <div className="text-right">
-                    <p
-                      className={cn(
-                        'text-2xl font-bold',
-                        isExpense ? 'text-red-600' : 'text-green-600'
-                      )}
-                    >
-                      {isExpense ? '-' : '+'}{formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
+                        {/* Info Principal */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                            <span className="truncate max-w-[100px]">{t.project}</span>
+                            {isExpense && t.categoryName !== 'N/A' && (
+                              <>
+                                <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                                <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                  {t.categoryName}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Monto */}
+                        <div className="text-right flex-shrink-0">
+                          <p className={cn(
+                            "text-sm font-bold",
+                            isExpense ? "text-gray-900" : "text-emerald-600"
+                          )}>
+                            {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {format(t.date, 'HH:mm')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })
-        )}
+            ))
+          )}
+        </div>
       </div>
 
-      {/* FABs - Floating Action Buttons */}
-      <div className="fixed bottom-20 sm:bottom-24 right-4 flex flex-col gap-3 z-40">
-        {/* FAB Aporte (Verde) */}
-        <button
-          onClick={() => setShowContributionForm(true)}
-          className="bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all flex items-center gap-2 group"
-          aria-label="Agregar Aporte"
-        >
-          <Plus className="w-6 h-6" />
-          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">
-            Aporte
-          </span>
-        </button>
+      {/* --- BOTÓN FLOTANTE (FAB) EXPANDIBLE --- */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        {isFabOpen && (
+          <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
+            <button 
+              onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }}
+              className="flex items-center gap-3 pr-1"
+            >
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">
+                Nuevo Aporte
+              </span>
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center hover:bg-emerald-600 transition-colors">
+                <Plus className="w-6 h-6" />
+              </div>
+            </button>
 
-        {/* FAB Gasto (Rojo) */}
+            <button 
+              onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }}
+              className="flex items-center gap-3 pr-1"
+            >
+              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">
+                Registrar Gasto
+              </span>
+              <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                <Minus className="w-6 h-6" />
+              </div>
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={() => setShowExpenseForm(true)}
-          className="bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all flex items-center gap-2 group"
-          aria-label="Agregar Gasto"
+          onClick={() => setIsFabOpen(!isFabOpen)}
+          className={cn(
+            "w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95",
+            isFabOpen ? "bg-gray-800 rotate-45" : "bg-blue-600"
+          )}
         >
-          <Minus className="w-6 h-6" />
-          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">
-            Gasto
-          </span>
+          <Plus className="w-7 h-7 text-white" />
         </button>
       </div>
 

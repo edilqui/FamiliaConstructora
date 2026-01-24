@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
@@ -9,9 +9,11 @@ import {
   ArrowLeft,
   X,
   Loader2,
-  AlertCircle,
   CheckCircle2,
-  Hash
+  AlertCircle,
+  Search,
+  Hash,
+  Activity
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import {
@@ -33,10 +35,16 @@ export default function CategoriesManager() {
   const navigate = useNavigate();
   const { categories } = useDashboardData();
 
+  // Estados
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<CategoryFormData>({ name: '', order: 1 });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Estado para búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Estados de feedback
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   const [usageCounts, setUsageCounts] = useState<Map<string, number>>(new Map());
@@ -50,19 +58,24 @@ export default function CategoriesManager() {
         const counts = await getAllCategoryUsageCounts(categories);
         setUsageCounts(counts);
       } catch (error) {
-        console.error('Error al cargar conteos de uso:', error);
+        console.error('Error al cargar conteos:', error);
       } finally {
         setLoadingUsage(false);
       }
     };
 
-    if (categories.length > 0) {
-      loadUsageCounts();
-    } else {
-      setLoadingUsage(false);
-    }
+    if (categories.length > 0) loadUsageCounts();
+    else setLoadingUsage(false);
   }, [categories]);
 
+  // Filtrar categorías
+  const filteredCategories = useMemo(() => {
+    return categories
+      .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => a.order - b.order);
+  }, [categories, searchTerm]);
+
+  // --- HANDLERS (Lógica intacta) ---
   const handleOpenCreateForm = async () => {
     const nextOrder = await getNextOrder();
     setFormData({ name: '', order: nextOrder });
@@ -85,317 +98,240 @@ export default function CategoriesManager() {
     setMessage('');
   };
 
+  const showFeedback = (msg: string, type: 'success' | 'error') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setMessage('');
-
-    if (!formData.name.trim()) {
-      setMessage('El nombre es requerido');
-      setMessageType('error');
-      return;
-    }
+    if (!formData.name.trim()) return showFeedback('El nombre es requerido', 'error');
 
     setLoading(true);
-
     try {
       if (isEditing && formData.id) {
-        await updateCategory({
-          id: formData.id,
-          name: formData.name.trim(),
-          order: formData.order,
-        });
-        setMessage('Categoría actualizada exitosamente');
+        await updateCategory({ id: formData.id, name: formData.name.trim(), order: formData.order });
+        showFeedback('Actualizado correctamente', 'success');
       } else {
-        await createCategory({
-          name: formData.name.trim(),
-          order: formData.order,
-        });
-        setMessage('Categoría creada exitosamente');
+        await createCategory({ name: formData.name.trim(), order: formData.order });
+        showFeedback('Creado correctamente', 'success');
       }
-
-      setMessageType('success');
-      setTimeout(() => {
-        handleCloseForm();
-        setMessage('');
-      }, 1500);
+      setTimeout(handleCloseForm, 1000);
     } catch (error) {
-      console.error('Error al guardar categoría:', error);
-      setMessage('Error al guardar. Intenta nuevamente.');
-      setMessageType('error');
+      showFeedback('Error al guardar', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (category: Category) => {
-    const confirmed = window.confirm(
-      `¿Estás seguro de eliminar la categoría "${category.name}"?`
-    );
-
-    if (!confirmed) return;
-
+    if (!window.confirm(`¿Eliminar "${category.name}"?`)) return;
     setLoading(true);
-    setMessage('');
-
     try {
       const result = await deleteCategory(category.id);
-
-      if (result.success) {
-        setMessage(result.message);
-        setMessageType('success');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage(result.message);
-        setMessageType('error');
-        setTimeout(() => setMessage(''), 5000);
-      }
+      if (result.success) showFeedback(result.message, 'success');
+      else showFeedback(result.message, 'error');
     } catch (error) {
-      console.error('Error al eliminar categoría:', error);
-      setMessage('Error al eliminar. Intenta nuevamente.');
-      setMessageType('error');
+      showFeedback('Error al eliminar', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/settings')}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <div className="flex items-center gap-3 flex-1">
-          <div className="p-2 bg-purple-100 rounded-full">
-            <Tag className="w-6 h-6 text-purple-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Categorías</h1>
-            <p className="text-sm text-gray-600">Gestionar categorías de gastos</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      
+      {/* --- HEADER STICKY CON BUSCADOR --- */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+        <div className="flex items-center gap-3 mb-3">
+          <button 
+            onClick={() => navigate('/settings')}
+            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900">Categorías</h1>
         </div>
-      </div>
 
-      {/* Message */}
+        {/* Buscador Integrado */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar categoría..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-100 text-sm py-2.5 pl-9 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-gray-400"
+          />
+        </div>
+      </header>
+
+      {/* --- ALERTA FLOTANTE (Toast) --- */}
       {message && (
-        <div
-          className={cn(
-            'p-3 rounded-lg flex items-start gap-2',
-            messageType === 'success' && 'bg-green-50 border border-green-200 text-green-800',
-            messageType === 'error' && 'bg-red-50 border border-red-200 text-red-800'
-          )}
-        >
-          {messageType === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm">{message}</p>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 w-[90%] max-w-sm">
+          <div className={cn(
+            "flex items-center gap-3 p-3 rounded-xl shadow-lg border text-sm font-medium",
+            messageType === 'success' ? "bg-white border-green-200 text-green-700" : "bg-white border-red-200 text-red-700"
+          )}>
+            {messageType === 'success' ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
+            {message}
+          </div>
         </div>
       )}
 
-      {/* Categories List */}
-      <div className="space-y-3">
-        {categories.length === 0 ? (
-          <div className="bg-white border-2 border-gray-200 rounded-lg p-12 text-center">
-            <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium mb-2">No hay categorías</p>
-            <p className="text-sm text-gray-400">Crea la primera categoría para comenzar</p>
+      <div className="px-4 pt-4 max-w-lg mx-auto space-y-4">
+        
+        {/* --- LISTA DE CATEGORÍAS (Estilo iOS) --- */}
+        {filteredCategories.length === 0 ? (
+          <div className="text-center py-12 opacity-60">
+            <Tag className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm text-gray-500">
+              {searchTerm ? 'No se encontraron resultados' : 'No hay categorías creadas'}
+            </p>
           </div>
         ) : (
-          categories.map((category) => {
-            const usageCount = usageCounts.get(category.id) || 0;
-            const canDelete = usageCount === 0;
+          <div>
+            <div className="flex items-center justify-between px-2 mb-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Listado ({filteredCategories.length})</span>
+              <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">Ordenado por #</span>
+            </div>
 
-            return (
-              <div
-                key={category.id}
-                className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Tag className="w-5 h-5 text-purple-600" />
-                    </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+              {filteredCategories.map((category) => {
+                const usageCount = usageCounts.get(category.id) || 0;
+                const canDelete = usageCount === 0;
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-gray-800">{category.name}</p>
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Hash className="w-3 h-3" />
-                          {category.order}
-                        </span>
+                return (
+                  <div key={category.id} className="p-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {/* Icono / Orden */}
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 flex flex-col items-center justify-center flex-shrink-0 text-purple-600 border border-purple-100">
+                        <span className="text-[10px] font-bold">#{category.order}</span>
                       </div>
 
-                      <p className="text-sm text-gray-600">
-                        {loadingUsage ? (
-                          <span className="text-gray-400">Cargando...</span>
-                        ) : (
-                          <>
-                            {usageCount === 0 ? (
-                              <span className="text-gray-400">Sin usar</span>
-                            ) : (
-                              <span>
-                                Usado en <strong>{usageCount}</strong> transacción{usageCount !== 1 ? 'es' : ''}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{category.name}</p>
+                        
+                        {/* Info de uso (Chip pequeño) */}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {loadingUsage ? (
+                            <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
+                          ) : (
+                            <span className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded-md font-medium flex items-center gap-1",
+                              usageCount > 0 ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-400"
+                            )}>
+                              <Activity className="w-3 h-3" />
+                              {usageCount > 0 ? `${usageCount} usos` : 'Sin uso'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleOpenEditForm(category)}
+                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      
+                      {canDelete && !loadingUsage && (
+                        <button 
+                          onClick={() => handleDelete(category)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleOpenEditForm(category)}
-                      disabled={loading}
-                      className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors disabled:opacity-50"
-                      aria-label="Editar"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-
-                    <button
-                      onClick={() => handleDelete(category)}
-                      disabled={loading || !canDelete || loadingUsage}
-                      className={cn(
-                        'p-2 rounded-lg transition-colors',
-                        canDelete && !loadingUsage
-                          ? 'hover:bg-red-50 text-red-600'
-                          : 'text-gray-300 cursor-not-allowed'
-                      )}
-                      aria-label="Eliminar"
-                      title={!canDelete ? 'No se puede eliminar porque está en uso' : 'Eliminar'}
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Info Note */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Información importante:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Solo puedes eliminar categorías que no estén en uso</li>
-              <li>El número de orden determina cómo aparecen en los formularios</li>
-              <li>Puedes editar el nombre y orden de cualquier categoría</li>
-            </ul>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        {/* --- INFO CARD COMPACTA --- */}
+        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-3 items-start">
+          <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-blue-700 leading-relaxed">
+            El <strong>número de orden</strong> define cómo aparecen las categorías al crear gastos. Solo se pueden eliminar categorías sin historial.
+          </p>
         </div>
+
       </div>
 
-      {/* FAB - Add Category */}
+      {/* --- FAB (Botón Flotante) --- */}
       <button
         onClick={handleOpenCreateForm}
-        className="fixed bottom-20 sm:bottom-24 right-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all z-40 flex items-center gap-2 group"
-        aria-label="Agregar Categoría"
+        className="fixed bottom-6 right-6 bg-gray-900 hover:bg-black text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
       >
         <Plus className="w-6 h-6" />
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">
-          Nueva Categoría
-        </span>
+        <span className="font-medium text-sm pr-1">Nueva</span>
       </button>
 
-      {/* Modal - Create/Edit Category */}
+      {/* --- MODAL (Bottom Sheet Style en móvil si se quisiera, aquí Centered Clean) --- */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b bg-purple-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-600 rounded-full">
-                  <Tag className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  {isEditing ? 'Editar Categoría' : 'Nueva Categoría'}
-                </h2>
-              </div>
-              <button
-                onClick={handleCloseForm}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                aria-label="Cerrar"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h2 className="font-bold text-gray-800">
+                {isEditing ? 'Editar Categoría' : 'Nueva Categoría'}
+              </h2>
+              <button onClick={handleCloseForm} className="p-1 rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-5 space-y-5">
-              {/* Nombre */}
+            {/* Formulario */}
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de la Categoría
-                </label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Nombre</label>
                 <input
-                  id="name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej: Materiales, Jornales..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
+                  placeholder="Ej: Materiales"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
 
-              {/* Orden */}
               <div>
-                <label htmlFor="order" className="block text-sm font-medium text-gray-700 mb-2">
-                  Orden (posición en la lista)
-                </label>
-                <input
-                  id="order"
-                  type="number"
-                  min="1"
-                  value={formData.order}
-                  onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Las categorías se ordenan de menor a mayor número
-                </p>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Orden de aparición</label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.order}
+                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white focus:outline-none transition-all font-mono"
+                  />
+                </div>
               </div>
 
-              {/* Botones */}
-              <div className="flex gap-3 pt-2">
+              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
                   onClick={handleCloseForm}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                  disabled={loading}
+                  className="flex-1 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className={cn(
-                    'flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2',
-                    loading && 'opacity-50 cursor-not-allowed'
-                  )}
+                  className="flex-1 py-3 bg-purple-600 text-white rounded-xl text-sm font-semibold shadow-md hover:bg-purple-700 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>{isEditing ? 'Actualizar' : 'Crear Categoría'}</>
-                  )}
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isEditing ? 'Guardar' : 'Crear'}
                 </button>
               </div>
             </form>

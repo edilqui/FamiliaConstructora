@@ -1,6 +1,9 @@
 import { useDashboardData } from '../hooks/useDashboardData';
 import { formatCurrency, formatDate } from '../lib/utils';
-import { Loader2, TrendingUp, Receipt, Users, Briefcase } from 'lucide-react';
+import { 
+  Loader2, TrendingUp, TrendingDown, Wallet, 
+  Users, Briefcase, ChevronRight, Activity 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Statistics() {
@@ -9,252 +12,204 @@ export default function Statistics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  // Calcular totales
+  // Calcular totales (Asegurando que no haya NaN)
   const totalContributions = transactions
     .filter((t) => t.type === 'contribution')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
 
   const totalExpenses = transactions
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
 
-  // Últimas transacciones
+  // Últimas 5 transacciones (Solo necesitamos un resumen aquí, no las 20)
   const recentTransactions = transactions
     .sort((a, b) => b.date.getTime() - a.date.getTime())
-    .slice(0, 20);
+    .slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      {/* Resumen General */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Estadísticas Generales</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-green-50 border-2 border-green-500 p-5 rounded-lg">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-green-500 rounded-full">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-700">Total Aportes</h3>
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      
+      {/* --- HEADER STICKY --- */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
+        <h1 className="text-lg font-bold text-gray-900">Estadísticas</h1>
+        <p className="text-xs text-gray-500">Resumen financiero del grupo</p>
+      </header>
+
+      <div className="px-4 pt-4 space-y-6 max-w-lg mx-auto">
+        
+        {/* --- TARJETAS DE RESUMEN (KPIs) --- */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Aportes */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 relative overflow-hidden group">
+            <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+              <TrendingUp className="w-12 h-12 text-emerald-600" />
             </div>
-            <p className="text-3xl font-bold text-green-700">
-              {formatCurrency(totalContributions)}
-            </p>
+            <div className="p-2 bg-emerald-50 w-fit rounded-lg mb-2">
+              <TrendingUp className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Ingresos Totales</p>
+              <p className="text-lg font-bold text-gray-900">{formatCurrency(totalContributions)}</p>
+            </div>
           </div>
 
-          <div className="bg-red-50 border-2 border-red-500 p-5 rounded-lg">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-red-500 rounded-full">
-                <Receipt className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-700">Total Gastos</h3>
+          {/* Gastos */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 relative overflow-hidden group">
+            <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+              <TrendingDown className="w-12 h-12 text-red-600" />
             </div>
-            <p className="text-3xl font-bold text-red-700">
-              {formatCurrency(totalExpenses)}
-            </p>
+            <div className="p-2 bg-red-50 w-fit rounded-lg mb-2">
+              <TrendingDown className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Gastos Totales</p>
+              <p className="text-lg font-bold text-gray-900">{formatCurrency(totalExpenses)}</p>
+            </div>
           </div>
 
-          <div className="bg-blue-50 border-2 border-blue-500 p-5 rounded-lg">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-500 rounded-full">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-700">En Caja</h3>
+          {/* Caja (Ocupa ancho completo) */}
+          <div className="col-span-2 bg-gradient-to-r from-blue-600 to-indigo-700 p-5 rounded-2xl shadow-lg text-white flex items-center justify-between relative overflow-hidden">
+             <div className="absolute -right-6 -bottom-6 opacity-20">
+              <Wallet className="w-32 h-32" />
             </div>
-            <p className="text-3xl font-bold text-blue-700">
-              {formatCurrency(totalInBox)}
-            </p>
+            <div>
+              <p className="text-blue-100 text-sm font-medium mb-1">Saldo Disponible en Caja</p>
+              <p className="text-3xl font-bold tracking-tight">{formatCurrency(totalInBox)}</p>
+            </div>
+            <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Tabla de Aportes por Usuario */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-6 h-6 text-gray-700" />
-          <h2 className="text-2xl font-bold text-gray-800">Detalle por Hermano</h2>
-        </div>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hermano
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aportado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Su parte (25%)
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Balance
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {userStats.map((stat) => (
-                <tr key={stat.userId}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{stat.userName}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-green-600 font-semibold">
-                      {formatCurrency(stat.totalContributed)}
+        {/* --- LISTA DE HERMANOS (Reemplazo de Tabla) --- */}
+        <div>
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Balance por Miembro
+          </h2>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+            {userStats.map((stat) => {
+              const isPositive = stat.balance >= 0;
+              return (
+                <div key={stat.userId} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {/* Avatar con iniciales */}
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border border-gray-200">
+                      {stat.userName.charAt(0)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-gray-900">
-                      {formatCurrency(stat.share)}
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{stat.userName}</p>
+                      <p className="text-xs text-gray-400">Cuota: {formatCurrency(stat.share)}</p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div
-                      className={cn(
-                        'font-semibold',
-                        stat.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                      )}
-                    >
-                      {formatCurrency(Math.abs(stat.balance))}
-                      {stat.balance >= 0 ? ' a favor' : ' debe'}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  </div>
 
-      {/* Tabla de Gastos por Proyecto */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Briefcase className="w-6 h-6 text-gray-700" />
-          <h2 className="text-2xl font-bold text-gray-800">Detalle por Proyecto</h2>
+                  <div className="text-right">
+                    <p className={cn(
+                      "font-bold text-sm",
+                      isPositive ? "text-emerald-600" : "text-red-600"
+                    )}>
+                      {isPositive ? '+' : ''}{formatCurrency(stat.balance)}
+                    </p>
+                    <p className="text-[10px] text-gray-400 uppercase font-medium">
+                      {isPositive ? 'A favor' : 'Debe'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Proyecto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Gastado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  # Transacciones
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  % del Total
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {projectStats.map((stat) => {
-                const percentage = totalExpenses > 0 ? (stat.totalSpent / totalExpenses) * 100 : 0;
 
-                return (
-                  <tr key={stat.projectId}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{stat.projectName}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-red-600 font-semibold">
-                        {formatCurrency(stat.totalSpent)}
+        {/* --- GASTOS POR PROYECTO (Con Barras de Progreso) --- */}
+        <div>
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Briefcase className="w-4 h-4" />
+            Distribución de Gastos
+          </h2>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-5">
+            {projectStats.map((stat) => {
+              const percentage = totalExpenses > 0 ? (stat.totalSpent / totalExpenses) * 100 : 0;
+              
+              return (
+                <div key={stat.projectId}>
+                  <div className="flex justify-between items-end mb-1">
+                    <span className="text-sm font-semibold text-gray-800">{stat.projectName}</span>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-gray-900">{formatCurrency(stat.totalSpent)}</span>
+                      <span className="text-xs text-gray-400 ml-2">({stat.transactionCount} mov.)</span>
+                    </div>
+                  </div>
+                  
+                  {/* Barra de progreso */}
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1 text-right">{percentage.toFixed(1)}% del total</p>
+                </div>
+              );
+            })}
+             {projectStats.length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-2">No hay gastos registrados por proyecto</p>
+             )}
+          </div>
+        </div>
+
+        {/* --- ACTIVIDAD RECIENTE (Resumen Compacto) --- */}
+        <div>
+           <div className="flex items-center justify-between mb-3">
+             <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Última Actividad
+            </h2>
+             {/* Enlace visual para ir al historial completo si quisieras implementarlo */}
+             {/* <span className="text-xs text-blue-600 font-medium">Ver todo</span> */}
+           </div>
+
+           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+              {recentTransactions.map((transaction) => {
+                 const isExpense = transaction.type === 'expense';
+                 return (
+                   <div key={transaction.id} className="p-3.5 flex items-center justify-between">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                         <div className={cn(
+                           "w-2 h-2 rounded-full flex-shrink-0",
+                           isExpense ? "bg-red-500" : "bg-emerald-500"
+                         )} />
+                         <div className="min-w-0">
+                           <p className="text-sm font-medium text-gray-900 truncate pr-2">
+                             {transaction.description}
+                           </p>
+                           <p className="text-xs text-gray-400">
+                             {formatDate(transaction.date)}
+                           </p>
+                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">{stat.transactionCount}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">{percentage.toFixed(1)}%</div>
-                    </td>
-                  </tr>
-                );
+                      <span className={cn(
+                        "text-sm font-bold whitespace-nowrap",
+                        isExpense ? "text-gray-900" : "text-emerald-600"
+                      )}>
+                        {isExpense ? '-' : '+'}{formatCurrency(transaction.amount)}
+                      </span>
+                   </div>
+                 )
               })}
-            </tbody>
-          </table>
+              {recentTransactions.length === 0 && (
+                <div className="p-4 text-center text-gray-400 text-sm">Sin actividad reciente</div>
+              )}
+           </div>
         </div>
-      </div>
 
-      {/* Historial de Transacciones */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Últimas Transacciones</h2>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Categoría
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Descripción
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Monto
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {recentTransactions.map((transaction) => (
-                <tr key={transaction.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(transaction.date)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={cn(
-                        'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                        transaction.type === 'contribution'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      )}
-                    >
-                      {transaction.type === 'contribution' ? 'Aporte' : 'Gasto'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-700">
-                      {transaction.type === 'expense' ? (
-                        <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-xs font-medium">
-                          {transaction.categoryName || 'Sin categoría'}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">-</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{transaction.description}</div>
-                    <div className="text-sm text-gray-500">{transaction.project}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div
-                      className={cn(
-                        'text-sm font-semibold',
-                        transaction.type === 'contribution' ? 'text-green-600' : 'text-red-600'
-                      )}
-                    >
-                      {transaction.type === 'contribution' ? '+' : '-'}
-                      {formatCurrency(transaction.amount)}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );

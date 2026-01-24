@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
@@ -11,19 +11,20 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  DollarSign,
-  Play,
-  Pause,
-  CheckCircle,
-  TrendingUp
+  Search,
+  Banknote,
+  TrendingUp,
+  Receipt,
+  PlayCircle,
+  PauseCircle,
+  StopCircle
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import {
   createProject,
   updateProject,
   deleteProject,
-  getAllProjectsStats,
-  updateProjectStatus
+  getAllProjectsStats
 } from '../services/projectService';
 import type { Project } from '../types';
 
@@ -45,20 +46,22 @@ export default function ProjectsManager() {
   const navigate = useNavigate();
   const { projects } = useDashboardData();
 
+  // Estados
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<ProjectFormData>({
-    name: '',
-    budget: 0,
-    status: 'active',
-  });
+  const [formData, setFormData] = useState<ProjectFormData>({ name: '', budget: 0, status: 'active' });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Feedback
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
+
+  // Stats
   const [projectsStats, setProjectsStats] = useState<Map<string, ProjectStats>>(new Map());
   const [loadingStats, setLoadingStats] = useState(true);
 
-  // Cargar estadísticas de proyectos
+  // Cargar estadísticas
   useEffect(() => {
     const loadProjectsStats = async () => {
       setLoadingStats(true);
@@ -66,388 +69,241 @@ export default function ProjectsManager() {
         const stats = await getAllProjectsStats(projects);
         setProjectsStats(stats);
       } catch (error) {
-        console.error('Error al cargar estadísticas:', error);
+        console.error('Error stats:', error);
       } finally {
         setLoadingStats(false);
       }
     };
-
-    if (projects.length > 0) {
-      loadProjectsStats();
-    } else {
-      setLoadingStats(false);
-    }
+    if (projects.length > 0) loadProjectsStats();
+    else setLoadingStats(false);
   }, [projects]);
+
+  // Filtrar Proyectos
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [projects, searchTerm]);
+
+  // --- HANDLERS ---
+  const showFeedback = (msg: string, type: 'success' | 'error') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 3000);
+  };
 
   const handleOpenCreateForm = () => {
     setFormData({ name: '', budget: 0, status: 'active' });
     setIsEditing(false);
     setShowForm(true);
-    setMessage('');
   };
 
   const handleOpenEditForm = (project: Project) => {
-    setFormData({
-      id: project.id,
-      name: project.name,
-      budget: project.budget,
-      status: project.status,
-    });
+    setFormData({ ...project });
     setIsEditing(true);
     setShowForm(true);
-    setMessage('');
   };
 
   const handleCloseForm = () => {
     setShowForm(false);
     setFormData({ name: '', budget: 0, status: 'active' });
-    setIsEditing(false);
-    setMessage('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setMessage('');
-
-    if (!formData.name.trim()) {
-      setMessage('El nombre es requerido');
-      setMessageType('error');
-      return;
-    }
-
-    if (formData.budget < 0) {
-      setMessage('El presupuesto no puede ser negativo');
-      setMessageType('error');
-      return;
-    }
+    if (!formData.name.trim()) return showFeedback('Nombre requerido', 'error');
 
     setLoading(true);
-
     try {
       if (isEditing && formData.id) {
-        await updateProject({
-          id: formData.id,
-          name: formData.name.trim(),
-          budget: formData.budget,
-          status: formData.status,
-        });
-        setMessage('Proyecto actualizado exitosamente');
+        await updateProject({ ...formData, id: formData.id });
+        showFeedback('Proyecto actualizado', 'success');
       } else {
-        await createProject({
-          name: formData.name.trim(),
-          budget: formData.budget,
-          status: formData.status,
-        });
-        setMessage('Proyecto creado exitosamente');
+        await createProject(formData);
+        showFeedback('Proyecto creado', 'success');
       }
-
-      setMessageType('success');
-      setTimeout(() => {
-        handleCloseForm();
-        setMessage('');
-      }, 1500);
+      setTimeout(handleCloseForm, 500);
     } catch (error) {
-      console.error('Error al guardar proyecto:', error);
-      setMessage('Error al guardar. Intenta nuevamente.');
-      setMessageType('error');
+      showFeedback('Error al guardar', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (project: Project) => {
-    const confirmed = window.confirm(
-      `¿Estás seguro de eliminar el proyecto "${project.name}"?`
-    );
-
-    if (!confirmed) return;
-
+    if (!window.confirm(`¿Eliminar proyecto "${project.name}"?`)) return;
     setLoading(true);
-    setMessage('');
-
     try {
       const result = await deleteProject(project.id);
-
-      if (result.success) {
-        setMessage(result.message);
-        setMessageType('success');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage(result.message);
-        setMessageType('error');
-        setTimeout(() => setMessage(''), 5000);
-      }
+      if (result.success) showFeedback(result.message, 'success');
+      else showFeedback(result.message, 'error');
     } catch (error) {
-      console.error('Error al eliminar proyecto:', error);
-      setMessage('Error al eliminar. Intenta nuevamente.');
-      setMessageType('error');
+      showFeedback('Error al eliminar', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChangeStatus = async (projectId: string, newStatus: 'active' | 'paused' | 'completed') => {
-    setLoading(true);
-    setMessage('');
-
-    try {
-      await updateProjectStatus(projectId, newStatus);
-      setMessage('Estado actualizado exitosamente');
-      setMessageType('success');
-      setTimeout(() => setMessage(''), 2000);
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
-      setMessage('Error al cambiar estado. Intenta nuevamente.');
-      setMessageType('error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusConfig = (status: string) => {
+  // Helper para estilos de estado
+  const getStatusStyles = (status: string) => {
     switch (status) {
-      case 'active':
-        return {
-          label: 'Activo',
-          icon: Play,
-          color: 'text-green-600',
-          bg: 'bg-green-100',
-          border: 'border-green-300',
-        };
-      case 'paused':
-        return {
-          label: 'Pausado',
-          icon: Pause,
-          color: 'text-yellow-600',
-          bg: 'bg-yellow-100',
-          border: 'border-yellow-300',
-        };
-      case 'completed':
-        return {
-          label: 'Completado',
-          icon: CheckCircle,
-          color: 'text-blue-600',
-          bg: 'bg-blue-100',
-          border: 'border-blue-300',
-        };
-      default:
-        return {
-          label: status,
-          icon: FolderKanban,
-          color: 'text-gray-600',
-          bg: 'bg-gray-100',
-          border: 'border-gray-300',
-        };
+      case 'active': return { bg: 'bg-green-100', text: 'text-green-700', icon: PlayCircle, label: 'Activo' };
+      case 'paused': return { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: PauseCircle, label: 'Pausado' };
+      case 'completed': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: StopCircle, label: 'Terminado' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-700', icon: FolderKanban, label: status };
     }
   };
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/settings')}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <div className="flex items-center gap-3 flex-1">
-          <div className="p-2 bg-blue-100 rounded-full">
-            <FolderKanban className="w-6 h-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Proyectos</h1>
-            <p className="text-sm text-gray-600">Gestionar proyectos y presupuestos</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      
+      {/* --- HEADER STICKY --- */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+        <div className="flex items-center gap-3 mb-3">
+          <button 
+            onClick={() => navigate('/settings')}
+            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900">Proyectos</h1>
         </div>
-      </div>
 
-      {/* Message */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar proyecto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-100 text-sm py-2.5 pl-9 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-gray-400"
+          />
+        </div>
+      </header>
+
+      {/* --- TOAST --- */}
       {message && (
-        <div
-          className={cn(
-            'p-3 rounded-lg flex items-start gap-2',
-            messageType === 'success' && 'bg-green-50 border border-green-200 text-green-800',
-            messageType === 'error' && 'bg-red-50 border border-red-200 text-red-800'
-          )}
-        >
-          {messageType === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm">{message}</p>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 w-[90%] max-w-sm">
+          <div className={cn(
+            "flex items-center gap-3 p-3 rounded-xl shadow-lg border text-sm font-medium",
+            messageType === 'success' ? "bg-white border-green-200 text-green-700" : "bg-white border-red-200 text-red-700"
+          )}>
+            {messageType === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+            {message}
+          </div>
         </div>
       )}
 
-      {/* Projects List */}
-      <div className="space-y-3">
-        {projects.length === 0 ? (
-          <div className="bg-white border-2 border-gray-200 rounded-lg p-12 text-center">
-            <FolderKanban className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium mb-2">No hay proyectos</p>
-            <p className="text-sm text-gray-400">Crea el primer proyecto para comenzar</p>
+      {/* --- LISTA DE PROYECTOS --- */}
+      <div className="px-4 pt-4 max-w-lg mx-auto space-y-4">
+        {filteredProjects.length === 0 ? (
+          <div className="text-center py-12 opacity-60">
+            <FolderKanban className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm text-gray-500">
+              {searchTerm ? 'No se encontraron resultados' : 'Crea tu primer proyecto'}
+            </p>
           </div>
         ) : (
-          projects.map((project) => {
+          filteredProjects.map((project) => {
             const stats = projectsStats.get(project.id);
-            const statusConfig = getStatusConfig(project.status);
-            const StatusIcon = statusConfig.icon;
+            const statusStyle = getStatusStyles(project.status);
+            const StatusIcon = statusStyle.icon;
+            
+            // Cálculos
+            const totalSpent = stats?.totalSpent || 0;
+            const budget = project.budget;
+            const hasBudget = budget > 0;
+            const percentSpent = hasBudget ? (totalSpent / budget) * 100 : 0;
+            const isOverBudget = hasBudget && totalSpent > budget;
             const canDelete = (stats?.transactionCount || 0) === 0;
-            const percentSpent = project.budget > 0 ? (stats?.totalSpent || 0) / project.budget * 100 : 0;
 
             return (
-              <div
-                key={project.id}
-                className={cn(
-                  'bg-white border-2 rounded-lg p-4 transition-colors',
-                  statusConfig.border
-                )}
+              <div 
+                key={project.id} 
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-all hover:shadow-md"
               >
-                <div className="space-y-3">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className={cn('p-2 rounded-lg', statusConfig.bg)}>
-                        <FolderKanban className={cn('w-5 h-5', statusConfig.color)} />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-bold text-gray-800">{project.name}</p>
-                          <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', statusConfig.bg, statusConfig.color)}>
-                            <StatusIcon className="w-3 h-3" />
-                            {statusConfig.label}
-                          </span>
-                        </div>
-
-                        {loadingStats ? (
-                          <p className="text-sm text-gray-400">Cargando estadísticas...</p>
-                        ) : (
-                          <div className="space-y-1">
-                            <p className="text-sm text-gray-600">
-                              Presupuesto: <strong className="text-gray-800">{formatCurrency(project.budget)}</strong>
-                            </p>
-                            {stats && (
-                              <>
-                                <p className="text-sm text-gray-600">
-                                  Gastado: <strong className={cn(percentSpent > 100 ? 'text-red-600' : 'text-gray-800')}>
-                                    {formatCurrency(stats.totalSpent)}
-                                  </strong>
-                                  {project.budget > 0 && (
-                                    <span className="text-xs ml-1">
-                                      ({percentSpent.toFixed(1)}%)
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  {stats.transactionCount === 0 ? (
-                                    <span className="text-gray-400">Sin transacciones</span>
-                                  ) : (
-                                    <>
-                                      {stats.expenseCount} gasto{stats.expenseCount !== 1 ? 's' : ''} • {stats.contributionCount} aporte{stats.contributionCount !== 1 ? 's' : ''}
-                                    </>
-                                  )}
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                {/* Cabecera Tarjeta */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex gap-3">
+                    <div className="p-2.5 bg-orange-50 rounded-xl h-fit">
+                      <FolderKanban className="w-5 h-5 text-orange-600" />
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenEditForm(project)}
-                        disabled={loading}
-                        className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors disabled:opacity-50"
-                        aria-label="Editar"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(project)}
-                        disabled={loading || !canDelete || loadingStats}
-                        className={cn(
-                          'p-2 rounded-lg transition-colors',
-                          canDelete && !loadingStats
-                            ? 'hover:bg-red-50 text-red-600'
-                            : 'text-gray-300 cursor-not-allowed'
-                        )}
-                        aria-label="Eliminar"
-                        title={!canDelete ? 'No se puede eliminar porque tiene transacciones' : 'Eliminar'}
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                    <div>
+                      <h3 className="font-bold text-gray-900 leading-tight">{project.name}</h3>
+                      <div className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide mt-1",
+                        statusStyle.bg, statusStyle.text
+                      )}>
+                        <StatusIcon className="w-3 h-3" />
+                        {statusStyle.label}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  {project.budget > 0 && stats && (
-                    <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                        <div
+                  {/* Acciones */}
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => handleOpenEditForm(project)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    {canDelete && !loadingStats && (
+                      <button 
+                        onClick={() => handleDelete(project)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Métricas Financieras */}
+                <div className="bg-gray-50 rounded-xl p-3 mb-3">
+                  <div className="flex justify-between items-end mb-1">
+                    <span className="text-xs text-gray-500 font-medium">Ejecutado</span>
+                    <span className={cn(
+                      "text-lg font-bold",
+                      isOverBudget ? "text-red-600" : "text-gray-900"
+                    )}>
+                      {formatCurrency(totalSpent)}
+                    </span>
+                  </div>
+
+                  {/* Barra de Progreso */}
+                  {hasBudget ? (
+                    <div className="space-y-1.5">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div 
                           className={cn(
-                            'h-full rounded-full transition-all',
-                            percentSpent > 100 ? 'bg-red-500' : percentSpent > 80 ? 'bg-yellow-500' : 'bg-green-500'
+                            "h-full rounded-full transition-all duration-500",
+                            percentSpent > 100 ? "bg-red-500" : percentSpent > 80 ? "bg-amber-500" : "bg-blue-500"
                           )}
                           style={{ width: `${Math.min(percentSpent, 100)}%` }}
                         />
                       </div>
-                      {percentSpent > 100 && (
-                        <p className="text-xs text-red-600 font-medium">
-                          ⚠️ Presupuesto excedido en {formatCurrency(stats.totalSpent - project.budget)}
-                        </p>
-                      )}
+                      <div className="flex justify-between text-[10px] text-gray-400 font-medium uppercase">
+                        <span>{percentSpent.toFixed(0)}% Gastado</span>
+                        <span>Presupuesto: {formatCurrency(budget)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                      <TrendingUp className="w-3 h-3" /> Sin límite de presupuesto
                     </div>
                   )}
+                </div>
 
-                  {/* Status Change Buttons */}
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    <button
-                      onClick={() => handleChangeStatus(project.id, 'active')}
-                      disabled={loading || project.status === 'active'}
-                      className={cn(
-                        'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                        project.status === 'active'
-                          ? 'bg-green-100 text-green-700 cursor-default'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300'
-                      )}
-                    >
-                      <Play className="w-4 h-4" />
-                      Activo
-                    </button>
-
-                    <button
-                      onClick={() => handleChangeStatus(project.id, 'paused')}
-                      disabled={loading || project.status === 'paused'}
-                      className={cn(
-                        'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                        project.status === 'paused'
-                          ? 'bg-yellow-100 text-yellow-700 cursor-default'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-yellow-50 hover:border-yellow-300'
-                      )}
-                    >
-                      <Pause className="w-4 h-4" />
-                      Pausado
-                    </button>
-
-                    <button
-                      onClick={() => handleChangeStatus(project.id, 'completed')}
-                      disabled={loading || project.status === 'completed'}
-                      className={cn(
-                        'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                        project.status === 'completed'
-                          ? 'bg-blue-100 text-blue-700 cursor-default'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300'
-                      )}
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Completado
-                    </button>
+                {/* Footer Stats */}
+                <div className="flex gap-4 text-xs text-gray-500 px-1">
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>{stats?.expenseCount || 0} gastos</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Banknote className="w-3.5 h-3.5" />
+                    <span>{stats?.contributionCount || 0} aportes</span>
                   </div>
                 </div>
               </div>
@@ -456,144 +312,94 @@ export default function ProjectsManager() {
         )}
       </div>
 
-      {/* Info Note */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Información importante:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Solo puedes eliminar proyectos sin transacciones</li>
-              <li>El presupuesto es opcional (0 = sin límite)</li>
-              <li>Puedes cambiar el estado del proyecto en cualquier momento</li>
-              <li>La barra de progreso muestra el % gastado del presupuesto</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* FAB - Add Project */}
+      {/* --- FAB --- */}
       <button
         onClick={handleOpenCreateForm}
-        className="fixed bottom-20 sm:bottom-24 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all z-40 flex items-center gap-2 group"
-        aria-label="Agregar Proyecto"
+        className="fixed bottom-6 right-6 bg-orange-600 hover:bg-orange-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
       >
         <Plus className="w-6 h-6" />
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">
-          Nuevo Proyecto
-        </span>
+        <span className="font-medium text-sm pr-1">Nuevo</span>
       </button>
 
-      {/* Modal - Create/Edit Project */}
+      {/* --- MODAL --- */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b bg-blue-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600 rounded-full">
-                  <FolderKanban className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  {isEditing ? 'Editar Proyecto' : 'Nuevo Proyecto'}
-                </h2>
-              </div>
-              <button
-                onClick={handleCloseForm}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                aria-label="Cerrar"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h2 className="font-bold text-gray-800">
+                {isEditing ? 'Editar Proyecto' : 'Nuevo Proyecto'}
+              </h2>
+              <button onClick={handleCloseForm} className="p-1 rounded-full hover:bg-gray-200 text-gray-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-5 space-y-5">
-              {/* Nombre */}
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del Proyecto
-                </label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Nombre</label>
                 <input
-                  id="name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej: Construcción de Apartamentos"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
+                  placeholder="Ej: Remodelación Baño"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
 
-              {/* Presupuesto */}
               <div>
-                <label htmlFor="budget" className="block text-sm font-medium text-gray-700 mb-2">
-                  Presupuesto
-                </label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Presupuesto</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400">$</span>
+                  <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
-                    id="budget"
                     type="number"
                     step="0.01"
                     min="0"
                     value={formData.budget}
                     onChange={(e) => setFormData({ ...formData, budget: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                    className="w-full pl-10 pr-4 py-3 text-xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all font-mono"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Ingresa 0 si no quieres establecer un presupuesto límite
-                </p>
+                <p className="text-[10px] text-gray-400 mt-1 ml-1">Pon 0 para presupuesto ilimitado</p>
               </div>
 
-              {/* Estado */}
               <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-                  Estado del Proyecto
-                </label>
-                <select
-                  id="status"
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="active">Activo</option>
-                  <option value="paused">Pausado</option>
-                  <option value="completed">Completado</option>
-                </select>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Estado</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: 'active', label: 'Activo', icon: PlayCircle },
+                    { val: 'paused', label: 'Pausa', icon: PauseCircle },
+                    { val: 'completed', label: 'Fin', icon: CheckCircle2 }
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setFormData({...formData, status: opt.val as any})}
+                      className={cn(
+                        "flex flex-col items-center gap-1 p-2 rounded-xl border transition-all",
+                        formData.status === opt.val 
+                          ? "bg-blue-50 border-blue-500 text-blue-700 shadow-sm" 
+                          : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      <opt.icon className="w-5 h-5" />
+                      <span className="text-[10px] font-bold uppercase">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Botones */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCloseForm}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                  disabled={loading}
-                >
+              <div className="pt-2 flex gap-3">
+                <button type="button" onClick={handleCloseForm} className="flex-1 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl">
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className={cn(
-                    'flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2',
-                    loading && 'opacity-50 cursor-not-allowed'
-                  )}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>{isEditing ? 'Actualizar' : 'Crear Proyecto'}</>
-                  )}
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isEditing ? 'Guardar' : 'Crear'}
                 </button>
               </div>
             </form>
