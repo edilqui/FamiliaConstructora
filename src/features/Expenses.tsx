@@ -309,7 +309,11 @@ export default function Expenses() {
                                 {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
                               </p>
                               <p className="text-[10px] text-gray-400 mt-0.5">
-                                {format(t.date, 'HH:mm')}
+                                {t.quantity && t.unitPrice ? (
+                                  <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
+                                ) : (
+                                  format(t.date, 'HH:mm')
+                                )}
                               </p>
                             </div>
                           </button>

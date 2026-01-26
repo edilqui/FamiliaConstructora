@@ -1,9 +1,9 @@
 import { useState, FormEvent, useEffect, useMemo } from 'react';
-import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown, Calculator } from 'lucide-react';
+import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown, Calculator, Package } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
@@ -35,6 +35,21 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+
+  // Modo detallado (cantidad × valor unitario)
+  const [detailedMode, setDetailedMode] = useState(false);
+  const [quantity, setQuantity] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
+
+  // Calcular monto automáticamente en modo detallado
+  useEffect(() => {
+    if (detailedMode && quantity && unitPrice) {
+      const calculatedAmount = parseFloat(quantity) * parseFloat(unitPrice);
+      if (!isNaN(calculatedAmount)) {
+        setAmount(calculatedAmount.toFixed(2));
+      }
+    }
+  }, [quantity, unitPrice, detailedMode]);
 
   // Organizar categorías por grupos
   const { groupedCategories, groups } = useMemo(() => {
@@ -70,6 +85,13 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
       setTime(format(transactionToEdit.date, 'HH:mm')); // Extraer hora existente
+
+      // Cargar quantity y unitPrice si existen
+      if (transactionToEdit.quantity !== undefined && transactionToEdit.unitPrice !== undefined) {
+        setDetailedMode(true);
+        setQuantity(transactionToEdit.quantity.toString());
+        setUnitPrice(transactionToEdit.unitPrice.toString());
+      }
     }
   }, [transactionToEdit]);
 
@@ -125,6 +147,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           userId: transactionToEdit.userId,
           description: description || `Gasto en ${selectedProject?.name}`,
           notes: notes || undefined,
+          quantity: detailedMode && quantity ? parseFloat(quantity) : null,
+          unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : null,
           date: transactionDate,
         });
       } else {
@@ -156,6 +180,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             registeredBy: user.id,
             description: description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`,
             notes: notes || undefined,
+            quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
+            unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
             date: transactionDate,
           });
         } else {
@@ -170,6 +196,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             registeredBy: user.id,
             description: description || `Gasto en ${selectedProject?.name}`,
             notes: notes || undefined,
+            quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
+            unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
             date: transactionDate,
           });
         }
@@ -215,7 +243,61 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
 
           {/* MONTO (Input Gigante) */}
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Monto</label>
+            <div className="flex items-center justify-between mb-2 ml-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Monto</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailedMode(!detailedMode);
+                  // No limpiar los valores al cambiar de modo
+                  // Los valores se mantienen en el estado para que el usuario pueda volver
+                }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <Package className="w-3.5 h-3.5" />
+                {detailedMode ? 'Modo simple' : 'Calcular por cantidad'}
+              </button>
+            </div>
+
+            {/* Modo Detallado: Cantidad y Valor Unitario */}
+            {detailedMode && (
+              <div className="mb-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3 animate-in slide-in-from-top-2 fade-in">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-blue-700 mb-1.5 block">Cantidad</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 text-lg font-semibold text-gray-900 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                      autoFocus={detailedMode}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-blue-700 mb-1.5 block">Precio Unit.</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={unitPrice}
+                        onChange={(e) => setUnitPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-7 pr-3 py-2 text-lg font-semibold text-gray-900 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <div className="flex-shrink-0 w-1 h-1 bg-blue-400 rounded-full"></div>
+                  <span>El monto se calculará automáticamente</span>
+                </div>
+              </div>
+            )}
+
+            {/* Campo de Monto */}
             <div className="relative flex gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
@@ -225,19 +307,28 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-gray-50 border-2 border-transparent focus:border-red-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
+                  className={cn(
+                    "w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-gray-50 border-2 rounded-2xl focus:outline-none transition-all placeholder:text-gray-300",
+                    detailedMode
+                      ? "border-blue-200 bg-blue-50/30 cursor-not-allowed"
+                      : "border-transparent focus:border-red-500 focus:bg-white"
+                  )}
                   required
-                  autoFocus={!isEditMode}
+                  autoFocus={!isEditMode && !detailedMode}
+                  disabled={detailedMode}
+                  readOnly={detailedMode}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCalculator(true)}
-                className="flex-shrink-0 w-16 h-16 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl flex items-center justify-center transition-colors active:scale-95"
-                title="Abrir calculadora"
-              >
-                <Calculator className="w-7 h-7" />
-              </button>
+              {!detailedMode && (
+                <button
+                  type="button"
+                  onClick={() => setShowCalculator(true)}
+                  className="flex-shrink-0 w-16 h-16 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl flex items-center justify-center transition-colors active:scale-95"
+                  title="Abrir calculadora"
+                >
+                  <Calculator className="w-7 h-7" />
+                </button>
+              )}
             </div>
             {!isEditMode && paymentSource === 'caja' && (
               <p className="text-xs text-gray-400 mt-2 text-right">

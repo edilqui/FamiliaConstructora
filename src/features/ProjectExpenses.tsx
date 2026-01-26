@@ -266,7 +266,11 @@ export default function ProjectExpenses() {
                                 </span>
                               )}
                               <span className="text-[10px] text-gray-400">
-                                {format(t.date, 'HH:mm')}
+                                {t.quantity && t.unitPrice ? (
+                                  <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
+                                ) : (
+                                  format(t.date, 'HH:mm')
+                                )}
                               </span>
                             </div>
                           </div>

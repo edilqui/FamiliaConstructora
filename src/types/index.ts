@@ -34,6 +34,8 @@ export interface Transaction {
   date: Date;
   description: string; // Nombre corto de la transacción
   notes?: string; // Notas adicionales (opcional)
+  quantity?: number; // Cantidad de productos (opcional, para gastos detallados)
+  unitPrice?: number; // Precio unitario (opcional, para gastos detallados)
   createdAt: Date;
 }
 
