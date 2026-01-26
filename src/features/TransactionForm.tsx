@@ -96,7 +96,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     if (!categoryId) return setError('Selecciona una categoría');
     
     const amountValue = parseFloat(amount);
-    if (!amount || amountValue <= 0) return setError('Ingresa un monto válido');
+    if (!amount || amountValue < 0) return setError('Ingresa un monto válido');
 
     if (!isEditMode && paymentSource === 'caja' && amountValue > totalInBox) {
       return setError(`Saldo insuficiente. Disponible: ${formatCurrency(totalInBox)}`);
