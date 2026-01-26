@@ -220,11 +220,25 @@ export default function Dashboard() {
 
             {/* Gráfico Circular (Categorías) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-4">
-                 <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
                     <PieIcon className="w-4 h-4" />
                   </div>
-                <h3 className="font-bold text-gray-800 text-sm">Top Categorías</h3>
+                  <h3 className="font-bold text-gray-800 text-sm">Top Categorías</h3>
+                </div>
+
+                {/* BOTÓN DE FILTRO */}
+                <button
+                  onClick={() => setShowFilterModal(true)}
+                  className="p-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
+                  aria-label="Filtrar Categorías"
+                >
+                  <Filter className="w-4 h-4" />
+                  {hasActiveFilters && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-purple-600 rounded-full ring-2 ring-white" />
+                  )}
+                </button>
               </div>
               <div className="flex items-center">
                 <div className="h-40 w-40 relative flex-shrink-0">
