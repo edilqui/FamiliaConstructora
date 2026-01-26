@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown, Calculator } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
@@ -35,6 +35,30 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+
+  // Organizar categorías por grupos
+  const { groupedCategories, groups } = useMemo(() => {
+    const groups = categories.filter(c => c.isGroup === true);
+    const regularCategories = categories.filter(c => c.isGroup === false || c.isGroup === undefined);
+
+    const grouped: { group: { id: string; name: string } | null; items: typeof categories }[] = [];
+
+    // Categorías agrupadas por su parent
+    groups.forEach(group => {
+      const groupItems = regularCategories.filter(c => c.parentId === group.id);
+      if (groupItems.length > 0) {
+        grouped.push({ group: { id: group.id, name: group.name }, items: groupItems });
+      }
+    });
+
+    // Categorías sin grupo (huérfanas)
+    const orphanCategories = regularCategories.filter(c => !c.parentId);
+    if (orphanCategories.length > 0) {
+      grouped.push({ group: null, items: orphanCategories });
+    }
+
+    return { groupedCategories: grouped, groups };
+  }, [categories]);
 
   // Cargar datos en edición
   useEffect(() => {
@@ -263,7 +287,27 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                   required
                 >
                   <option value="">Seleccionar...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {groupedCategories.map((group, index) => {
+                    if (group.group) {
+                      // Categorías agrupadas
+                      return (
+                        <optgroup key={group.group.id} label={group.group.name}>
+                          {group.items.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    } else {
+                      // Categorías sin grupo
+                      return (
+                        <optgroup key={`orphan-${index}`} label="Sin grupo">
+                          {group.items.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    }
+                  })}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>

@@ -5,24 +5,30 @@ import type { Category } from '../types';
 interface CreateCategoryParams {
   name: string;
   order: number;
+  isGroup: boolean;
+  parentId: string | null;
 }
 
 interface UpdateCategoryParams {
   id: string;
   name: string;
   order: number;
+  isGroup?: boolean;
+  parentId?: string | null;
 }
 
 /**
  * Crea una nueva categoría
  */
 export const createCategory = async (params: CreateCategoryParams): Promise<void> => {
-  const { name, order } = params;
+  const { name, order, isGroup, parentId } = params;
 
   const categoriesRef = collection(db, 'categories');
   await addDoc(categoriesRef, {
     name,
     order,
+    isGroup,
+    parentId,
     createdAt: serverTimestamp(),
   });
 };
@@ -31,14 +37,24 @@ export const createCategory = async (params: CreateCategoryParams): Promise<void
  * Actualiza una categoría existente
  */
 export const updateCategory = async (params: UpdateCategoryParams): Promise<void> => {
-  const { id, name, order } = params;
+  const { id, name, order, isGroup, parentId } = params;
 
   const categoryRef = doc(db, 'categories', id);
-  await updateDoc(categoryRef, {
+  const updateData: any = {
     name,
     order,
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  // Solo actualizar isGroup y parentId si se proporcionan
+  if (isGroup !== undefined) {
+    updateData.isGroup = isGroup;
+  }
+  if (parentId !== undefined) {
+    updateData.parentId = parentId;
+  }
+
+  await updateDoc(categoryRef, updateData);
 };
 
 /**

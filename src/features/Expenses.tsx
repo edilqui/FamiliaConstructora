@@ -79,6 +79,30 @@ export default function Expenses() {
 
   const hasActiveFilters = filterType !== 'all' || filterProject !== 'all' || filterCategory !== 'all' || searchTerm !== '';
 
+  // Organizar categorías por grupos para el filtro
+  const groupedCategories = useMemo(() => {
+    const groups = categories.filter(c => c.isGroup === true);
+    const regularCategories = categories.filter(c => c.isGroup === false || c.isGroup === undefined);
+
+    const grouped: { group: { id: string; name: string } | null; items: typeof categories }[] = [];
+
+    // Categorías agrupadas por su parent
+    groups.forEach(group => {
+      const groupItems = regularCategories.filter(c => c.parentId === group.id);
+      if (groupItems.length > 0) {
+        grouped.push({ group: { id: group.id, name: group.name }, items: groupItems });
+      }
+    });
+
+    // Categorías sin grupo (huérfanas)
+    const orphanCategories = regularCategories.filter(c => !c.parentId);
+    if (orphanCategories.length > 0) {
+      grouped.push({ group: null, items: orphanCategories });
+    }
+
+    return grouped;
+  }, [categories]);
+
   // --- AGRUPACIÓN POR FECHA (CORREGIDA) ---
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: typeof filteredTransactions } = {};
@@ -162,7 +186,27 @@ export default function Expenses() {
                 className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 mb-2 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todas las categorías</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {groupedCategories.map((group, index) => {
+                  if (group.group) {
+                    // Categorías agrupadas
+                    return (
+                      <optgroup key={group.group.id} label={group.group.name}>
+                        {group.items.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  } else {
+                    // Categorías sin grupo
+                    return (
+                      <optgroup key={`orphan-${index}`} label="Sin grupo">
+                        {group.items.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                })}
               </select>
             )}
 

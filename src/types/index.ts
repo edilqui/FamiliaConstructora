@@ -15,6 +15,8 @@ export interface Category {
   id: string;
   name: string;
   order: number; // Para ordenar las categorías
+  isGroup: boolean; // true si es un grupo padre, false si es una categoría normal
+  parentId: string | null; // null si es grupo, ID del grupo padre si es categoría
 }
 
 export type TransactionType = 'expense' | 'contribution';
