@@ -26,7 +26,7 @@ const navItems: NavItem[] = [
   },
   {
     path: '/statistics',
-    label: 'Estadísticas',
+    label: 'Reportes',
     icon: BarChart3,
   },
   {
