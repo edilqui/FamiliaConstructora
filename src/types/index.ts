@@ -66,3 +66,29 @@ export interface DashboardData {
   userStats: UserStats[];
   projectStats: ProjectStats[];
 }
+
+export type NotificationType = 'contribution_created' | 'expense_created' | 'transaction_edited' | 'transaction_deleted';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  message: string;
+  createdBy: string; // userId del usuario que realizó la acción
+  createdByName: string; // Nombre del usuario
+  createdAt: Date;
+  transactionId?: string; // ID de la transacción relacionada
+  transactionDescription?: string; // Descripción de la transacción
+  amount?: number; // Monto de la transacción
+  projectName?: string; // Nombre del proyecto
+  readBy: string[]; // Array de userIds que ya la leyeron/eliminaron
+}
+
+// --- TAREAS / NOTAS ---
+export interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: Date;
+  createdBy: string; // userId del usuario que creó la tarea
+  completedAt?: Date;
+}

@@ -10,6 +10,7 @@ import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
+import NotificationButton from '../components/NotificationButton';
 
 export default function Balance() {
   const { userStats, transactions, totalExpenses, totalInBox, projects } = useDashboardData();
@@ -120,6 +121,7 @@ export default function Balance() {
             <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Finanzas</h1>
           </div>
           <div className="flex gap-2">
+             <NotificationButton />
              {/* Botones placeholder para filtros */}
             <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
               <Filter className="w-5 h-5" />

@@ -9,6 +9,7 @@ import {
 import TransactionForm from './TransactionForm';
 import ContributionForm from './ContributionForm';
 import InitializeDataPanel from '../components/InitializeDataPanel';
+import NotificationButton from '../components/NotificationButton';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
@@ -136,7 +137,7 @@ export default function Dashboard() {
       {/* --- HEADER (Limpio) --- */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 lg:px-8 py-3 lg:py-4 border-b border-gray-100 flex justify-between items-center shadow-sm">
         <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard</h1>
-        {/* Aquí ya no está el botón de filtros */}
+        <NotificationButton />
       </header>
 
       <div className="px-4 lg:px-8 pt-6 space-y-6 max-w-7xl mx-auto">

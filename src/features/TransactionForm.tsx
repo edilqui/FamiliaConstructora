@@ -96,10 +96,17 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   }, [transactionToEdit]);
 
   const handleDelete = async () => {
-    if (!transactionToEdit) return;
+    if (!transactionToEdit || !user) return;
     setLoading(true);
     try {
-      await deleteTransaction(transactionToEdit.id);
+      const selectedProject = projects.find(p => p.id === transactionToEdit.projectId);
+      await deleteTransaction({
+        id: transactionToEdit.id,
+        deletedBy: user.id,
+        deletedByName: user.name,
+        description: transactionToEdit.description,
+        projectName: selectedProject?.name || 'Proyecto'
+      });
       onClose();
     } catch (err) {
       setError('Error al eliminar. Intenta nuevamente.');
@@ -150,6 +157,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           quantity: detailedMode && quantity ? parseFloat(quantity) : null,
           unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : null,
           date: transactionDate,
+          updatedBy: user.id,
+          updatedByName: user.name,
         });
       } else {
         if (paymentSource !== 'caja') {
@@ -164,6 +173,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             categoryName: 'N/A',
             userId: paymentSource,
             registeredBy: user.id,
+            registeredByName: user.name,
             description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo)`,
             notes: notes || undefined,
             date: transactionDate,
@@ -178,6 +188,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             categoryName: selectedCategory?.name || 'Sin categoría',
             userId: user.id,
             registeredBy: user.id,
+            registeredByName: user.name,
             description: description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`,
             notes: notes || undefined,
             quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
@@ -194,6 +205,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             categoryName: selectedCategory?.name || 'Sin categoría',
             userId: user.id,
             registeredBy: user.id,
+            registeredByName: user.name,
             description: description || `Gasto en ${selectedProject?.name}`,
             notes: notes || undefined,
             quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,

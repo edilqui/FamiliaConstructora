@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
 import TransactionForm from './TransactionForm';
+import NotificationButton from '../components/NotificationButton';
 
 export default function Expenses() {
   const { transactions, projects, categories, totalContributions, totalExpenses } = useDashboardData();
@@ -129,19 +130,22 @@ export default function Expenses() {
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Historial</h1>
-          
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(
-              "p-2 rounded-full transition-colors relative",
-              hasActiveFilters ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"
-            )}
-          >
-            <Filter className="w-5 h-5" />
-            {hasActiveFilters && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-            )}
-          </button>
+
+          <div className="flex items-center gap-2">
+            <NotificationButton />
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "p-2 rounded-full transition-colors relative",
+                hasActiveFilters ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"
+              )}
+            >
+              <Filter className="w-5 h-5" />
+              {hasActiveFilters && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Buscador Integrado */}

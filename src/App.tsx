@@ -9,6 +9,7 @@ import Balance from './features/Balance';
 import Settings from './features/Settings';
 import CategoriesManager from './features/CategoriesManager';
 import ProjectsManager from './features/ProjectsManager';
+import TasksManager from './features/TasksManager';
 import ProjectExpenses from './features/ProjectExpenses';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
@@ -126,6 +127,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <ProjectsManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/tasks"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TasksManager />
               </Layout>
             </ProtectedRoute>
           }

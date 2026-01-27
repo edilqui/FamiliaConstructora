@@ -45,10 +45,16 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   }, [transactionToEdit]);
 
   const handleDelete = async () => {
-    if (!transactionToEdit) return;
+    if (!transactionToEdit || !currentUser) return;
     setLoading(true);
     try {
-      await deleteTransaction(transactionToEdit.id);
+      await deleteTransaction({
+        id: transactionToEdit.id,
+        deletedBy: currentUser.id,
+        deletedByName: currentUser.name,
+        description: transactionToEdit.description,
+        projectName: 'Aporte'
+      });
       onClose();
     } catch (err) {
       setError('Error al eliminar. Intenta nuevamente.');
@@ -91,6 +97,8 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           description: description || `Aporte de ${userName}`,
           notes: notes || undefined,
           date: transactionDate,
+          updatedBy: currentUser.id,
+          updatedByName: currentUser.name,
         });
       } else {
         await addTransaction({
@@ -102,6 +110,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           categoryName: 'N/A',
           userId: userId,
           registeredBy: currentUser.id,
+          registeredByName: currentUser.name,
           description: description || `Aporte de ${userName}`,
           notes: notes || undefined,
           date: transactionDate,

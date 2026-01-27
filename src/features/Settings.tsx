@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Loader2,
   Shield,
-  Bell
+  Bell,
+  ListTodo
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -58,6 +59,16 @@ export default function Settings() {
       icon: FolderKanban,
       path: '/settings/projects',
       color: 'bg-orange-500',
+    },
+  ];
+
+  const toolsOptions: SettingOption[] = [
+    {
+      id: 'tasks',
+      label: 'Tareas',
+      icon: ListTodo,
+      path: '/settings/tasks',
+      color: 'bg-teal-500',
     },
   ];
 
@@ -177,7 +188,17 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* --- GRUPO 2: APP & CUENTA --- */}
+        {/* --- GRUPO 2: HERRAMIENTAS --- */}
+        <div>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-2">
+            Herramientas
+          </h3>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            {toolsOptions.map((opt, i) => renderOptionRow(opt, i === toolsOptions.length - 1))}
+          </div>
+        </div>
+
+        {/* --- GRUPO 3: APP & CUENTA --- */}
         <div>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-2">
             General

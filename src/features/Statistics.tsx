@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CategoryReport from './CategoryReport';
+import NotificationButton from '../components/NotificationButton';
 
 type TabType = 'statistics' | 'categories';
 
@@ -41,9 +42,12 @@ export default function Statistics() {
 
       {/* --- HEADER STICKY --- */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="px-4 lg:px-8 py-3 lg:py-4">
-          <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Reportes</h1>
-          <p className="text-xs lg:text-sm text-gray-500">Análisis y estadísticas financieras</p>
+        <div className="px-4 lg:px-8 py-3 lg:py-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Reportes</h1>
+            <p className="text-xs lg:text-sm text-gray-500">Análisis y estadísticas financieras</p>
+          </div>
+          <NotificationButton />
         </div>
 
         {/* Tabs */}
