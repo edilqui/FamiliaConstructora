@@ -270,55 +270,96 @@ export default function Expenses() {
                       {format(headerDate, "EEEE, d 'de' MMMM", { locale: es })}
                     </h3>
                     
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-                      {groupItems.map((t) => {
-                        const isExpense = t.type === 'expense';
-                        return (
-                          <button
-                            key={t.id}
-                            onClick={() => handleEditTransaction(t)}
-                            className="w-full p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
-                          >
-                            <div className={cn(
-                              "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                              isExpense ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
-                            )}>
-                              {isExpense ? <ArrowDownCircle className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
-                            </div>
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      {/* Header de tabla (solo desktop) */}
+                      <div className="hidden lg:grid lg:grid-cols-[auto_1fr_180px_150px_120px_140px] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <div className="w-10"></div>
+                        <div>Descripción</div>
+                        <div>Proyecto</div>
+                        <div>Categoría</div>
+                        <div className="text-center">Detalle</div>
+                        <div className="text-right">Monto</div>
+                      </div>
 
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                <span className="truncate max-w-[100px]">{t.project}</span>
-                                {isExpense && t.categoryName !== 'N/A' && (
-                                  <>
-                                    <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                                    <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                      {t.categoryName}
-                                    </span>
-                                  </>
+                      {/* Filas */}
+                      <div className="divide-y divide-gray-50">
+                        {groupItems.map((t) => {
+                          const isExpense = t.type === 'expense';
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => handleEditTransaction(t)}
+                              className="w-full p-3.5 lg:px-4 lg:py-3 flex lg:grid lg:grid-cols-[auto_1fr_180px_150px_120px_140px] items-center gap-3 lg:gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                            >
+                              {/* Icono */}
+                              <div className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                                isExpense ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
+                              )}>
+                                {isExpense ? <ArrowDownCircle className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                              </div>
+
+                              {/* Descripción - Layout móvil y desktop */}
+                              <div className="flex-1 min-w-0 lg:flex-none">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
+                                {/* Info adicional solo en móvil */}
+                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5 lg:hidden">
+                                  <span className="truncate max-w-[100px]">{t.project}</span>
+                                  {isExpense && t.categoryName !== 'N/A' && (
+                                    <>
+                                      <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                                      <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                        {t.categoryName}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Columnas solo desktop */}
+                              <div className="hidden lg:block text-sm text-gray-600 truncate">
+                                {t.project}
+                              </div>
+
+                              <div className="hidden lg:block">
+                                {isExpense && t.categoryName !== 'N/A' ? (
+                                  <span className="inline-block text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-md font-medium truncate max-w-full">
+                                    {t.categoryName}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">—</span>
                                 )}
                               </div>
-                            </div>
 
-                            <div className="text-right flex-shrink-0">
-                              <p className={cn(
-                                "text-sm font-bold",
-                                isExpense ? "text-gray-900" : "text-emerald-600"
-                              )}>
-                                {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
-                              </p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">
+                              <div className="hidden lg:block text-center text-xs text-gray-500">
                                 {t.quantity && t.unitPrice ? (
-                                  <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
+                                  <span className="font-medium">{t.quantity} × {formatCurrency(t.unitPrice)}</span>
                                 ) : (
-                                  format(t.date, 'HH:mm')
+                                  <span className="text-gray-400">{format(t.date, 'HH:mm')}</span>
                                 )}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
+                              </div>
+
+                              {/* Monto */}
+                              <div className="text-right flex-shrink-0">
+                                <p className={cn(
+                                  "text-sm lg:text-base font-bold",
+                                  isExpense ? "text-gray-900" : "text-emerald-600"
+                                )}>
+                                  {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
+                                </p>
+                                {/* Detalle solo móvil */}
+                                <p className="text-[10px] text-gray-400 mt-0.5 lg:hidden">
+                                  {t.quantity && t.unitPrice ? (
+                                    <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
+                                  ) : (
+                                    format(t.date, 'HH:mm')
+                                  )}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 );

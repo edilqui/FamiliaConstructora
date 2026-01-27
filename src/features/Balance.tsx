@@ -359,34 +359,58 @@ export default function Balance() {
             Tus Movimientos
           </h3>
 
-          <div className="space-y-3">
+          <div className="space-y-3 lg:space-y-0">
             {userContributions.length === 0 ? (
               <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-200">
                 <p className="text-gray-400 text-sm">Sin movimientos recientes</p>
               </div>
             ) : (
-              userContributions.map((contribution) => (
-                <button
-                  key={contribution.id}
-                  onClick={() => handleEditContribution(contribution)}
-                  className="w-full bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-50 rounded-lg text-green-600">
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800 line-clamp-1">{contribution.description}</p>
-                      <p className="text-xs text-gray-400">
-                        {format(contribution.date, "d MMM • HH:mm", { locale: es })}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-emerald-600 text-sm">
-                    +{formatCurrency(contribution.amount)}
-                  </span>
-                </button>
-              ))
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {/* Header de tabla (solo desktop) */}
+                <div className="hidden lg:grid lg:grid-cols-[auto_1fr_200px_140px] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <div className="w-10"></div>
+                  <div>Descripción</div>
+                  <div className="text-center">Fecha y Hora</div>
+                  <div className="text-right">Monto</div>
+                </div>
+
+                {/* Filas */}
+                <div className="divide-y divide-gray-50 lg:divide-gray-100">
+                  {userContributions.map((contribution) => (
+                    <button
+                      key={contribution.id}
+                      onClick={() => handleEditContribution(contribution)}
+                      className="w-full p-3 lg:px-4 lg:py-3 flex lg:grid lg:grid-cols-[auto_1fr_200px_140px] items-center gap-3 lg:gap-4 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      {/* Icono */}
+                      <div className="p-2 bg-green-50 rounded-lg text-green-600 flex-shrink-0">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+
+                      {/* Descripción - Layout móvil y desktop */}
+                      <div className="flex-1 min-w-0 lg:flex-none">
+                        <p className="text-sm font-medium text-gray-800 truncate">{contribution.description}</p>
+                        {/* Fecha solo en móvil */}
+                        <p className="text-xs text-gray-400 lg:hidden">
+                          {format(contribution.date, "d MMM • HH:mm", { locale: es })}
+                        </p>
+                      </div>
+
+                      {/* Fecha (solo desktop) */}
+                      <div className="hidden lg:block text-center text-sm text-gray-600">
+                        {format(contribution.date, "d MMM yyyy • HH:mm", { locale: es })}
+                      </div>
+
+                      {/* Monto */}
+                      <div className="text-right flex-shrink-0">
+                        <span className="font-bold text-emerald-600 text-sm lg:text-base">
+                          +{formatCurrency(contribution.amount)}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

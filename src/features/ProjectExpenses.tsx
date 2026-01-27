@@ -242,24 +242,36 @@ export default function ProjectExpenses() {
                     {format(new Date(dateKey), "EEEE, d 'de' MMMM", { locale: es })}
                   </h3>
                   
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-                    {groupItems.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => handleEditTransaction(t)}
-                        className="w-full p-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          {/* Icono de Categoría */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    {/* Header de tabla (solo desktop) */}
+                    <div className="hidden lg:grid lg:grid-cols-[auto_1fr_200px_150px_140px] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <div className="w-10"></div>
+                      <div>Descripción</div>
+                      <div>Categoría</div>
+                      <div className="text-center">Detalle</div>
+                      <div className="text-right">Monto</div>
+                    </div>
+
+                    {/* Filas */}
+                    <div className="divide-y divide-gray-50">
+                      {groupItems.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => handleEditTransaction(t)}
+                          className="w-full p-3.5 lg:px-4 lg:py-3 flex lg:grid lg:grid-cols-[auto_1fr_200px_150px_140px] items-center gap-3 lg:gap-4 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          {/* Icono */}
                           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0 text-red-600">
-                             <Receipt className="w-5 h-5" />
+                            <Receipt className="w-5 h-5" />
                           </div>
 
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate pr-2">
+                          {/* Descripción - Layout móvil y desktop */}
+                          <div className="flex-1 min-w-0 lg:flex-none overflow-hidden">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
                               {t.description}
                             </p>
-                            <div className="flex items-center gap-2 mt-0.5">
+                            {/* Info adicional solo en móvil */}
+                            <div className="flex items-center gap-2 mt-0.5 lg:hidden">
                               {t.categoryName !== 'N/A' && (
                                 <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium truncate">
                                   {t.categoryName}
@@ -274,15 +286,35 @@ export default function ProjectExpenses() {
                               </span>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-gray-900">
-                            -{formatCurrency(t.amount)}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                          {/* Columnas solo desktop */}
+                          <div className="hidden lg:block">
+                            {t.categoryName !== 'N/A' ? (
+                              <span className="inline-block text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-md font-medium truncate max-w-full">
+                                {t.categoryName}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </div>
+
+                          <div className="hidden lg:block text-center text-xs text-gray-500">
+                            {t.quantity && t.unitPrice ? (
+                              <span className="font-medium">{t.quantity} × {formatCurrency(t.unitPrice)}</span>
+                            ) : (
+                              <span className="text-gray-400">{format(t.date, 'HH:mm')}</span>
+                            )}
+                          </div>
+
+                          {/* Monto */}
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm lg:text-base font-bold text-gray-900">
+                              -{formatCurrency(t.amount)}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))

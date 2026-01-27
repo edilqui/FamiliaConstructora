@@ -219,37 +219,59 @@ export default function Statistics() {
                 </h2>
                </div>
 
-               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 overflow-hidden">
-                  {recentTransactions.map((transaction) => {
-                     const isExpense = transaction.type === 'expense';
-                     return (
-                       <div key={transaction.id} className="p-3.5 flex items-center justify-between">
-                          <div className="flex items-center gap-3 overflow-hidden">
-                             <div className={cn(
-                               "w-2 h-2 rounded-full flex-shrink-0",
-                               isExpense ? "bg-red-500" : "bg-emerald-500"
-                             )} />
-                             <div className="min-w-0">
-                               <p className="text-sm font-medium text-gray-900 truncate pr-2">
-                                 {transaction.description}
-                               </p>
-                               <p className="text-xs text-gray-400">
-                                 {formatDate(transaction.date)}
-                               </p>
-                             </div>
-                          </div>
-                          <span className={cn(
-                            "text-sm font-bold whitespace-nowrap",
-                            isExpense ? "text-gray-900" : "text-emerald-600"
-                          )}>
-                            {isExpense ? '-' : '+'}{formatCurrency(transaction.amount)}
-                          </span>
-                       </div>
-                     )
-                  })}
-                  {recentTransactions.length === 0 && (
-                    <div className="p-4 text-center text-gray-400 text-sm">Sin actividad reciente</div>
-                  )}
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  {/* Header de tabla (solo desktop) */}
+                  <div className="hidden lg:grid lg:grid-cols-[auto_1fr_180px_120px] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <div className="w-2"></div>
+                    <div>Descripción</div>
+                    <div className="text-center">Fecha</div>
+                    <div className="text-right">Monto</div>
+                  </div>
+
+                  {/* Filas */}
+                  <div className="divide-y divide-gray-50">
+                    {recentTransactions.map((transaction) => {
+                       const isExpense = transaction.type === 'expense';
+                       return (
+                         <div key={transaction.id} className="p-3.5 lg:px-4 lg:py-3 flex lg:grid lg:grid-cols-[auto_1fr_180px_120px] items-center gap-3 lg:gap-4">
+                            {/* Indicador de tipo */}
+                            <div className={cn(
+                              "w-2 h-2 rounded-full flex-shrink-0",
+                              isExpense ? "bg-red-500" : "bg-emerald-500"
+                            )} />
+
+                            {/* Descripción - Layout móvil y desktop */}
+                            <div className="flex-1 min-w-0 lg:flex-none overflow-hidden">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {transaction.description}
+                              </p>
+                              {/* Fecha solo en móvil */}
+                              <p className="text-xs text-gray-400 lg:hidden">
+                                {formatDate(transaction.date)}
+                              </p>
+                            </div>
+
+                            {/* Fecha (solo desktop) */}
+                            <div className="hidden lg:block text-center text-sm text-gray-600">
+                              {formatDate(transaction.date)}
+                            </div>
+
+                            {/* Monto */}
+                            <div className="text-right flex-shrink-0">
+                              <span className={cn(
+                                "text-sm lg:text-base font-bold whitespace-nowrap",
+                                isExpense ? "text-gray-900" : "text-emerald-600"
+                              )}>
+                                {isExpense ? '-' : '+'}{formatCurrency(transaction.amount)}
+                              </span>
+                            </div>
+                         </div>
+                       )
+                    })}
+                    {recentTransactions.length === 0 && (
+                      <div className="p-4 text-center text-gray-400 text-sm">Sin actividad reciente</div>
+                    )}
+                  </div>
                </div>
             </div>
           </>
