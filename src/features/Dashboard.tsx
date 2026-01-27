@@ -264,7 +264,7 @@ export default function Dashboard() {
                           padding: '8px 12px',
                           backgroundColor: 'white'
                         }}
-                        formatter={(value: number) => [formatCurrency(value), 'Monto']}
+                        formatter={(value: number | undefined) => [formatCurrency(value || 0), 'Monto']}
                         labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                       />
                     </PieChart>
