@@ -116,19 +116,19 @@ export default function ProjectExpenses() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
-      
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
         <div className="flex items-center gap-2 mb-3">
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-gray-900 truncate">{currentProject.name}</h1>
+            <h1 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">{currentProject.name}</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <FolderKanban className="w-3 h-3" /> Detalle de gastos
             </p>
@@ -202,7 +202,7 @@ export default function ProjectExpenses() {
         )}
       </header>
 
-      <div className="px-4 pt-4 max-w-lg mx-auto space-y-5">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto space-y-5">
         
         {/* --- TARJETA RESUMEN (TOTAL GASTADO) --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between relative overflow-hidden">

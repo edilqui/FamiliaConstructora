@@ -131,15 +131,15 @@ export default function Dashboard() {
   const myStats = userStats.find(s => s.userId === currentUser?.id);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
-      
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+
       {/* --- HEADER (Limpio) --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 py-3 border-b border-gray-100 flex justify-between items-center shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 lg:px-8 py-3 lg:py-4 border-b border-gray-100 flex justify-between items-center shadow-sm">
+        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard</h1>
         {/* Aquí ya no está el botón de filtros */}
       </header>
 
-      <div className="px-4 pt-6 space-y-6 max-w-lg mx-auto">
+      <div className="px-4 lg:px-8 pt-6 space-y-6 max-w-7xl mx-auto">
         
         {/* --- TARJETA PRINCIPAL (Total en Caja) --- */}
         <div className="relative overflow-hidden rounded-3xl bg-gray-900 text-white shadow-2xl p-6">
@@ -173,10 +173,10 @@ export default function Dashboard() {
 
         {/* --- CHARTS SECTION --- */}
         {filteredExpenses.length > 0 ? (
-          <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-            
+          <div className="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 animate-in slide-in-from-bottom-4 duration-500">
+
             {/* Gráfico de Barras (Tendencia) CON BOTÓN DE FILTRO */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
@@ -203,7 +203,7 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              <div className="h-48 w-full">
+              <div className="h-48 lg:h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={expenseTrendData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
@@ -219,7 +219,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico Circular (Categorías) */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
@@ -277,7 +277,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico de Progreso de Aportes por Usuario */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
                   <Users className="w-4 h-4" />
@@ -298,7 +298,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
                 {userContributionProgress.map((user, index) => (
                   <div key={index} className={cn(
                     "p-3 rounded-xl border transition-all",

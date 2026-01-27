@@ -37,13 +37,13 @@ export default function Statistics() {
     .slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="px-4 py-3">
-          <h1 className="text-lg font-bold text-gray-900">Reportes</h1>
-          <p className="text-xs text-gray-500">Análisis y estadísticas financieras</p>
+        <div className="px-4 lg:px-8 py-3 lg:py-4">
+          <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Reportes</h1>
+          <p className="text-xs lg:text-sm text-gray-500">Análisis y estadísticas financieras</p>
         </div>
 
         {/* Tabs */}
@@ -82,7 +82,7 @@ export default function Statistics() {
         </div>
       </header>
 
-      <div className="px-4 pt-4 space-y-6 max-w-lg mx-auto">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
 
         {/* Tab: Estadísticas */}
         {activeTab === 'statistics' && (

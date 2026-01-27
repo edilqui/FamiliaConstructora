@@ -155,18 +155,18 @@ export default function ProjectsManager() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
-      
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
         <div className="flex items-center gap-3 mb-3">
-          <button 
+          <button
             onClick={() => navigate('/settings')}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Proyectos</h1>
+          <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Proyectos</h1>
         </div>
 
         <div className="relative">
@@ -195,7 +195,7 @@ export default function ProjectsManager() {
       )}
 
       {/* --- LISTA DE PROYECTOS --- */}
-      <div className="px-4 pt-4 max-w-lg mx-auto space-y-4">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto space-y-4">
         {filteredProjects.length === 0 ? (
           <div className="text-center py-12 opacity-60">
             <FolderKanban className="w-12 h-12 mx-auto mb-2 text-gray-300" />

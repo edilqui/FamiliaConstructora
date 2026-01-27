@@ -108,16 +108,16 @@ export default function Balance() {
       : { bg: 'bg-emerald-600', light: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
-      
+    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
+
       {/* --- HEADER STICKY TIPO APP --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-gray-900 rounded-lg">
               <Scale className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-lg font-bold text-gray-900">Finanzas</h1>
+            <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Finanzas</h1>
           </div>
           <div className="flex gap-2">
              {/* Botones placeholder para filtros */}
@@ -140,7 +140,7 @@ export default function Balance() {
         </div>
       </header>
 
-      <div className="px-4 pt-4 space-y-6 max-w-lg mx-auto">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
 
         {/* --- TARJETA PRINCIPAL (HERO) --- */}
         {/* Eliminamos bordes gruesos, usamos sombras suaves y gradientes sutiles */}

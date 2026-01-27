@@ -123,12 +123,12 @@ export default function Expenses() {
   }, [filteredTransactions]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
-      
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm transition-all">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-gray-900">Historial</h1>
+          <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Historial</h1>
           
           <button 
             onClick={() => setShowFilters(!showFilters)}
@@ -224,7 +224,7 @@ export default function Expenses() {
         )}
       </header>
 
-      <div className="px-4 pt-4 max-w-lg mx-auto">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto">
         
         {/* --- WIDGETS DE RESUMEN --- */}
         <div className="grid grid-cols-2 gap-3 mb-6">
