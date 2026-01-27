@@ -256,6 +256,17 @@ export default function Dashboard() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '12px',
+                          border: 'none',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          padding: '8px 12px',
+                          backgroundColor: 'white'
+                        }}
+                        formatter={(value: number) => [formatCurrency(value), 'Monto']}
+                        labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
