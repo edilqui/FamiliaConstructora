@@ -5,7 +5,6 @@ import {
   deleteDoc,
   doc,
   query,
-  orderBy,
   onSnapshot,
   arrayUnion,
   serverTimestamp,
@@ -136,10 +135,7 @@ export const subscribeToNotifications = (
   callback: (notifications: Notification[]) => void
 ) => {
   const notificationsRef = collection(db, NOTIFICATIONS_COLLECTION);
-  const q = query(
-    notificationsRef,
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(notificationsRef);
 
   return onSnapshot(q, (snapshot) => {
     const notifications: Notification[] = [];
@@ -164,6 +160,9 @@ export const subscribeToNotifications = (
         });
       }
     });
+
+    // Ordenar en el cliente por fecha de creación (más reciente primero)
+    notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     callback(notifications);
   });
