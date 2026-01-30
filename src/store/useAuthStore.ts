@@ -3,7 +3,7 @@ import { User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { googleProvider, db } from '../config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { User } from '../types';
 
 interface AuthState {
@@ -11,6 +11,7 @@ interface AuthState {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   initialized: boolean;
+  isPendingApproval: boolean; // Nuevo: indica si el usuario está pendiente de aprobación
   login: () => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => void;
@@ -21,6 +22,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   firebaseUser: null,
   loading: true,
   initialized: false,
+  isPendingApproval: false,
 
   initialize: () => {
     onAuthStateChanged(auth, async (firebaseUser) => {
@@ -30,26 +32,53 @@ export const useAuthStore = create<AuthState>((set) => ({
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-          const userData = userSnap.data() as User;
+          const userData = userSnap.data();
+
+          // Si el usuario ya existe pero no tiene el campo 'approved',
+          // asumimos que es un usuario antiguo (uno de los 4 hermanos) y lo marcamos como aprobado
+          if (userData.approved === undefined) {
+            // Actualizar usuario existente para agregar campo approved
+            await setDoc(userRef, { approved: true }, { merge: true });
+            userData.approved = true;
+          }
+
+          const user: User = {
+            id: userSnap.id,
+            name: userData.name,
+            email: userData.email,
+            approved: userData.approved,
+            approvedBy: userData.approvedBy,
+            approvedAt: userData.approvedAt?.toDate(),
+            createdAt: userData.createdAt?.toDate(),
+          };
+
           set({
             firebaseUser,
-            user: userData,
+            user,
             loading: false,
-            initialized: true
+            initialized: true,
+            isPendingApproval: !user.approved
           });
         } else {
-          // Crear nuevo usuario en Firestore
+          // Crear nuevo usuario en Firestore - PENDIENTE DE APROBACIÓN
           const newUser: User = {
             id: firebaseUser.uid,
             name: firebaseUser.displayName || 'Usuario',
             email: firebaseUser.email || '',
+            approved: false, // Nuevo usuario NO está aprobado por defecto
           };
-          await setDoc(userRef, newUser);
+
+          await setDoc(userRef, {
+            ...newUser,
+            createdAt: serverTimestamp(),
+          });
+
           set({
             firebaseUser,
             user: newUser,
             loading: false,
-            initialized: true
+            initialized: true,
+            isPendingApproval: true // Nuevo usuario está pendiente
           });
         }
       } else {
@@ -57,7 +86,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           firebaseUser: null,
           user: null,
           loading: false,
-          initialized: true
+          initialized: true,
+          isPendingApproval: false
         });
       }
     });
@@ -78,7 +108,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     try {
       await signOut(auth);
-      set({ user: null, firebaseUser: null });
+      set({ user: null, firebaseUser: null, isPendingApproval: false });
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
       throw error;

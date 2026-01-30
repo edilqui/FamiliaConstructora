@@ -13,7 +13,8 @@ import {
   Loader2,
   Shield,
   Bell,
-  ListTodo
+  ListTodo,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -59,6 +60,13 @@ export default function Settings() {
       icon: FolderKanban,
       path: '/settings/projects',
       color: 'bg-orange-500',
+    },
+    {
+      id: 'access-control',
+      label: 'Control de Acceso',
+      icon: UserCheck,
+      path: '/settings/access-control',
+      color: 'bg-emerald-500',
     },
   ];
 

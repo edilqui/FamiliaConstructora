@@ -12,11 +12,13 @@ import ProjectsManager from './features/ProjectsManager';
 import TasksManager from './features/TasksManager';
 import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
+import UserApprovalManager from './features/UserApprovalManager';
+import PendingApproval from './features/PendingApproval';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, initialized } = useAuthStore();
+  const { user, loading, initialized, isPendingApproval } = useAuthStore();
 
   if (!initialized || loading) {
     return (
@@ -26,12 +28,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  // Si no hay usuario, redirigir a login
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Si el usuario está pendiente de aprobación, redirigir a pantalla de espera
+  if (isPendingApproval) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
   const initialize = useAuthStore((state) => state.initialize);
-  const { user, initialized } = useAuthStore();
+  const { user, initialized, isPendingApproval } = useAuthStore();
 
   useEffect(() => {
     initialize();
@@ -51,6 +63,19 @@ function App() {
         <Route
           path="/login"
           element={user ? <Navigate to="/" replace /> : <Login />}
+        />
+        <Route
+          path="/pending-approval"
+          element={
+            // Solo mostrar si hay usuario Y está pendiente
+            user && isPendingApproval ? (
+              <PendingApproval />
+            ) : user ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/"
@@ -148,6 +173,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <TasksManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/access-control"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <UserApprovalManager />
               </Layout>
             </ProtectedRoute>
           }

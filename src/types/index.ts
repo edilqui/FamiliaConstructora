@@ -2,6 +2,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  approved: boolean; // true si el usuario está aprobado para usar la app
+  approvedBy?: string; // userId del usuario que lo aprobó
+  approvedAt?: Date; // Fecha de aprobación
+  createdAt?: Date; // Fecha de creación del usuario
 }
 
 export interface Project {
