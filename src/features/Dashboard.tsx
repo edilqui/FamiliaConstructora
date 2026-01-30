@@ -105,6 +105,7 @@ export default function Dashboard() {
       const percentage = expected > 0 ? (contributed / expected) * 100 : 0;
 
       return {
+        userId: stats.userId,
         name: stats.userName,
         contributed,
         remaining,
@@ -312,10 +313,14 @@ export default function Dashboard() {
 
               <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
                 {userContributionProgress.map((user, index) => (
-                  <div key={index} className={cn(
-                    "p-3 rounded-xl border transition-all",
-                    user.isCurrentUser ? "bg-blue-50/50 border-blue-200" : "bg-gray-50 border-gray-100"
-                  )}>
+                  <button
+                    key={index}
+                    onClick={() => navigate(`/user/${user.userId}/contributions`)}
+                    className={cn(
+                      "p-3 rounded-xl border transition-all w-full text-left hover:shadow-md hover:scale-[1.01] active:scale-[0.99]",
+                      user.isCurrentUser ? "bg-blue-50/50 border-blue-200 hover:border-blue-300" : "bg-gray-50 border-gray-100 hover:border-gray-200"
+                    )}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div className={cn(
@@ -364,7 +369,7 @@ export default function Dashboard() {
                         style={{ width: `${Math.min(100, user.percentage)}%` }}
                       />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 

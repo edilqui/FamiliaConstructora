@@ -11,6 +11,7 @@ import CategoriesManager from './features/CategoriesManager';
 import ProjectsManager from './features/ProjectsManager';
 import TasksManager from './features/TasksManager';
 import ProjectExpenses from './features/ProjectExpenses';
+import UserContributions from './features/UserContributions';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
 
@@ -77,6 +78,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <ProjectExpenses />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/:userId/contributions"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <UserContributions />
               </Layout>
             </ProtectedRoute>
           }
