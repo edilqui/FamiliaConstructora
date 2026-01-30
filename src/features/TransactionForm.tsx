@@ -7,6 +7,7 @@ import { formatCurrency, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
+import CategorySelector from '../components/CategorySelector';
 
 interface TransactionFormProps {
   onClose: () => void;
@@ -50,30 +51,6 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       }
     }
   }, [quantity, unitPrice, detailedMode]);
-
-  // Organizar categorías por grupos
-  const { groupedCategories, groups } = useMemo(() => {
-    const groups = categories.filter(c => c.isGroup === true);
-    const regularCategories = categories.filter(c => c.isGroup === false || c.isGroup === undefined);
-
-    const grouped: { group: { id: string; name: string } | null; items: typeof categories }[] = [];
-
-    // Categorías agrupadas por su parent
-    groups.forEach(group => {
-      const groupItems = regularCategories.filter(c => c.parentId === group.id);
-      if (groupItems.length > 0) {
-        grouped.push({ group: { id: group.id, name: group.name }, items: groupItems });
-      }
-    });
-
-    // Categorías sin grupo (huérfanas)
-    const orphanCategories = regularCategories.filter(c => !c.parentId);
-    if (orphanCategories.length > 0) {
-      grouped.push({ group: null, items: orphanCategories });
-    }
-
-    return { groupedCategories: grouped, groups };
-  }, [categories]);
 
   // Cargar datos en edición
   useEffect(() => {
@@ -382,38 +359,13 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Categoría</label>
-              <div className="relative">
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all font-medium"
-                  required
-                >
-                  <option value="">Seleccionar...</option>
-                  {groupedCategories.map((group, index) => {
-                    if (group.group) {
-                      // Categorías agrupadas
-                      return (
-                        <optgroup key={group.group.id} label={group.group.name}>
-                          {group.items.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </optgroup>
-                      );
-                    } else {
-                      // Categorías sin grupo
-                      return (
-                        <optgroup key={`orphan-${index}`} label="Sin grupo">
-                          {group.items.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </optgroup>
-                      );
-                    }
-                  })}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+              <CategorySelector
+                categories={categories}
+                value={categoryId}
+                onChange={setCategoryId}
+                placeholder="Seleccionar..."
+                required
+              />
             </div>
           </div>
 
