@@ -32,11 +32,11 @@ service cloud.firestore {
       allow update, delete: if request.auth != null;
     }
 
-    // Tareas - usuarios solo pueden gestionar sus propias tareas
+    // Tareas - todos los usuarios autenticados pueden ver y gestionar todas las tareas
     match /tasks/{taskId} {
-      allow read: if request.auth != null && resource.data.createdBy == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
     }
   }
 }

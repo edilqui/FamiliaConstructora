@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { createTask, toggleTaskCompleted, deleteTask, subscribeToUserTasks } from '../services/taskService';
+import { createTask, toggleTaskCompleted, deleteTask, subscribeToAllTasks, updateTaskTitle } from '../services/taskService';
 import {
   ArrowLeft,
   Plus,
@@ -11,10 +11,45 @@ import {
   Trash2,
   ListTodo,
   CheckCheck,
-  AlertTriangle
+  AlertTriangle,
+  Pencil,
+  Check,
+  X,
+  Calendar
 } from 'lucide-react';
-import { cn } from '../lib/utils';
 import type { Task } from '../types';
+
+// Función para formatear fecha como "Hoy", "Ayer", o fecha completa
+const formatDateGroup = (date: Date): string => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const isToday = date.toDateString() === today.toDateString();
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) return 'Hoy';
+  if (isYesterday) return 'Ayer';
+
+  return date.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+};
+
+// Agrupar tareas por fecha
+const groupTasksByDate = (tasks: Task[]): Map<string, Task[]> => {
+  const groups = new Map<string, Task[]>();
+
+  tasks.forEach((task) => {
+    const dateKey = task.createdAt.toDateString();
+    const existing = groups.get(dateKey) || [];
+    groups.set(dateKey, [...existing, task]);
+  });
+
+  return groups;
+};
 
 export default function TasksManager() {
   const navigate = useNavigate();
@@ -26,17 +61,31 @@ export default function TasksManager() {
   const [addingTask, setAddingTask] = useState(false);
   const [error, setError] = useState('');
 
-  // Suscripción en tiempo real a las tareas del usuario
+  // Estado para edición
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Suscripción en tiempo real a todas las tareas
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = subscribeToUserTasks(user.id, (userTasks) => {
-      setTasks(userTasks);
+    const unsubscribe = subscribeToAllTasks((allTasks) => {
+      setTasks(allTasks);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [user]);
+
+  // Focus en el input de edición cuando se activa
+  useEffect(() => {
+    if (editingTaskId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingTaskId]);
 
   const handleAddTask = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,7 +95,7 @@ export default function TasksManager() {
     setError('');
 
     try {
-      await createTask(newTaskTitle.trim(), user.id);
+      await createTask(newTaskTitle.trim(), user.id, user.name);
       setNewTaskTitle('');
     } catch (err) {
       setError('Error al crear la tarea. Intenta nuevamente.');
@@ -71,9 +120,133 @@ export default function TasksManager() {
     }
   };
 
+  const startEditing = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditingTitle(task.title);
+  };
+
+  const cancelEditing = () => {
+    setEditingTaskId(null);
+    setEditingTitle('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTaskId || !editingTitle.trim()) return;
+
+    setSavingEdit(true);
+    try {
+      await updateTaskTitle(editingTaskId, editingTitle.trim());
+      setEditingTaskId(null);
+      setEditingTitle('');
+    } catch (err) {
+      console.error('Error al actualizar título:', err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      cancelEditing();
+    }
+  };
+
   // Separar tareas completadas y pendientes
   const pendingTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
+
+  // Agrupar tareas pendientes por fecha
+  const pendingByDate = groupTasksByDate(pendingTasks);
+  const completedByDate = groupTasksByDate(completedTasks);
+
+  // Componente de tarea individual
+  const TaskItem = ({ task, isCompleted }: { task: Task; isCompleted: boolean }) => {
+    const isEditing = editingTaskId === task.id;
+
+    return (
+      <div className="p-4 flex flex-col gap-2 hover:bg-gray-50 transition-colors group">
+        <div className="flex items-center gap-3">
+          {/* Checkbox */}
+          <button
+            onClick={() => handleToggleTask(task.id, task.completed)}
+            className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            {isCompleted ? (
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            ) : (
+              <Circle className="w-6 h-6 text-gray-400" />
+            )}
+          </button>
+
+          {/* Título o Input de edición */}
+          {isEditing ? (
+            <div className="flex-1 flex items-center gap-2">
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                disabled={savingEdit}
+              />
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit || !editingTitle.trim()}
+                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingEdit ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={cancelEditing}
+                className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className={`flex-1 text-sm ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}>
+                {task.title}
+              </p>
+
+              {/* Botón Editar */}
+              {!isCompleted && (
+                <button
+                  onClick={() => startEditing(task)}
+                  className="flex-shrink-0 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Botón Eliminar */}
+              <button
+                onClick={() => handleDeleteTask(task.id)}
+                className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Creador de la tarea - dato secundario sutil */}
+        {!isEditing && (
+          <div className="ml-10 flex items-center gap-1.5 text-[11px] text-gray-400">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+            <span>{task.createdByName}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
@@ -88,7 +261,7 @@ export default function TasksManager() {
         </button>
         <div className="flex-1">
           <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Tareas</h1>
-          <p className="text-xs lg:text-sm text-gray-500">Organiza tus recordatorios</p>
+          <p className="text-xs lg:text-sm text-gray-500">Organiza los recordatorios del grupo</p>
         </div>
         <div className="p-2 bg-blue-100 rounded-full">
           <ListTodo className="w-5 h-5 text-blue-600" />
@@ -137,81 +310,59 @@ export default function TasksManager() {
           </div>
         )}
 
-        {/* --- TAREAS PENDIENTES --- */}
+        {/* --- TAREAS PENDIENTES AGRUPADAS POR FECHA --- */}
         {!loading && pendingTasks.length > 0 && (
-          <div>
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 ml-2 flex items-center gap-2">
+          <div className="space-y-4">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-2 flex items-center gap-2">
               <Circle className="w-3 h-3" />
               Pendientes ({pendingTasks.length})
             </h2>
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 divide-y divide-gray-50">
-              {pendingTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors group"
-                >
-                  {/* Checkbox */}
-                  <button
-                    onClick={() => handleToggleTask(task.id, task.completed)}
-                    className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <Circle className="w-6 h-6 text-gray-400" />
-                  </button>
 
-                  {/* Título */}
-                  <p className="flex-1 text-sm text-gray-900 font-medium">
-                    {task.title}
-                  </p>
-
-                  {/* Botón Eliminar */}
-                  <button
-                    onClick={() => handleDeleteTask(task.id)}
-                    className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+            {Array.from(pendingByDate.entries()).map(([dateKey, dateTasks]) => (
+              <div key={dateKey}>
+                {/* Fecha del grupo */}
+                <div className="flex items-center gap-2 mb-2 ml-2">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-xs font-medium text-gray-500 capitalize">
+                    {formatDateGroup(dateTasks[0].createdAt)}
+                  </span>
                 </div>
-              ))}
-            </div>
+
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 divide-y divide-gray-50">
+                  {dateTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} isCompleted={false} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* --- TAREAS COMPLETADAS --- */}
+        {/* --- TAREAS COMPLETADAS AGRUPADAS POR FECHA --- */}
         {!loading && completedTasks.length > 0 && (
-          <div>
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 ml-2 flex items-center gap-2">
+          <div className="space-y-4">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-2 flex items-center gap-2">
               <CheckCheck className="w-3 h-3" />
               Completadas ({completedTasks.length})
             </h2>
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 divide-y divide-gray-50">
-              {completedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors group"
-                >
-                  {/* Checkbox completado */}
-                  <button
-                    onClick={() => handleToggleTask(task.id, task.completed)}
-                    className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                  </button>
 
-                  {/* Título tachado */}
-                  <p className="flex-1 text-sm text-gray-400 line-through">
-                    {task.title}
-                  </p>
-
-                  {/* Botón Eliminar */}
-                  <button
-                    onClick={() => handleDeleteTask(task.id)}
-                    className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+            {Array.from(completedByDate.entries()).map(([dateKey, dateTasks]) => (
+              <div key={dateKey}>
+                {/* Fecha del grupo */}
+                <div className="flex items-center gap-2 mb-2 ml-2">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-xs font-medium text-gray-500 capitalize">
+                    {formatDateGroup(dateTasks[0].createdAt)}
+                  </span>
                 </div>
-              ))}
-            </div>
+
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 divide-y divide-gray-50">
+                  {dateTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} isCompleted={true} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -223,7 +374,7 @@ export default function TasksManager() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay tareas</h3>
             <p className="text-sm text-gray-500">
-              Crea tu primera tarea para empezar a organizarte
+              Crea la primera tarea para empezar a organizar al grupo
             </p>
           </div>
         )}

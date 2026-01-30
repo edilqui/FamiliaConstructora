@@ -10,7 +10,8 @@
       "Bash(findstr:*)",
       "Bash(cat:*)",
       "Bash(npm run build:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(npx firebase deploy:*)"
     ],
     "deny": [],
     "ask": []

@@ -90,5 +90,6 @@ export interface Task {
   completed: boolean;
   createdAt: Date;
   createdBy: string; // userId del usuario que creó la tarea
+  createdByName: string; // Nombre del usuario que creó la tarea
   completedAt?: Date;
 }
