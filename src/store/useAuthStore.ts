@@ -42,11 +42,18 @@ export const useAuthStore = create<AuthState>((set) => ({
             userData.approved = true;
           }
 
+          // Si el usuario no tiene rol, asumimos que es 'member' (usuarios antiguos)
+          if (userData.role === undefined) {
+            await setDoc(userRef, { role: 'member' }, { merge: true });
+            userData.role = 'member';
+          }
+
           const user: User = {
             id: userSnap.id,
             name: userData.name,
             email: userData.email,
             approved: userData.approved,
+            role: userData.role || 'member',
             approvedBy: userData.approvedBy,
             approvedAt: userData.approvedAt?.toDate(),
             createdAt: userData.createdAt?.toDate(),
@@ -66,6 +73,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             name: firebaseUser.displayName || 'Usuario',
             email: firebaseUser.email || '',
             approved: false, // Nuevo usuario NO está aprobado por defecto
+            role: 'member', // Por defecto es miembro, se puede cambiar al aprobar
           };
 
           await setDoc(userRef, {

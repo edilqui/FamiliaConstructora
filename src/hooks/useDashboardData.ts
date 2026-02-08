@@ -88,6 +88,9 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
   // Total en caja = Aportes - Gastos
   const totalInBox = totalContributions - totalExpenses;
 
+  // Contar solo los miembros (no colaboradores) para la división de gastos
+  const memberCount = users.filter((u) => u.role === 'member' || u.role === undefined).length || 4;
+
   // Calcular estadísticas por usuario
   const userStats: UserStats[] = users.map((user) => {
     const userContributions = transactions
@@ -98,11 +101,14 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
       .filter((t) => t.type === 'expense' && t.userId === user.id)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Cada hermano debe pagar 1/4 del total de gastos
-    const share = totalExpenses / 4;
+    // Determinar si es miembro o colaborador
+    const isMember = user.role === 'member' || user.role === undefined;
 
-    // Balance = Lo que ha aportado - Su parte proporcional
-    const balance = userContributions - share;
+    // Solo los miembros dividen gastos, los colaboradores no tienen cuota
+    const share = isMember ? totalExpenses / memberCount : 0;
+
+    // Balance: Miembros = aportado - cuota, Colaboradores = solo lo aportado (siempre positivo)
+    const balance = isMember ? userContributions - share : userContributions;
 
     return {
       userId: user.id,

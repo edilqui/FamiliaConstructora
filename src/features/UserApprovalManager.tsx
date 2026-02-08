@@ -24,17 +24,22 @@ import {
   Users,
   Trash2,
   AlertCircle,
-  XCircle
+  XCircle,
+  UserCog,
+  Heart,
+  Crown
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { UserRole } from '../types';
 
 interface UserData {
   id: string;
   name: string;
   email: string;
   approved: boolean;
+  role: UserRole;
   approvedBy?: string;
   approvedAt?: Date;
   createdAt?: Date;
@@ -50,6 +55,8 @@ export default function UserApprovalManager() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showRemoveUserConfirm, setShowRemoveUserConfirm] = useState<string | null>(null);
+  const [showRoleSelector, setShowRoleSelector] = useState<string | null>(null);
+  const [pendingApprovalRole, setPendingApprovalRole] = useState<UserRole>('member');
 
   // Calcular transacciones por usuario
   const transactionsByUser = useMemo(() => {
@@ -84,16 +91,18 @@ export default function UserApprovalManager() {
           name: data.name,
           email: data.email,
           approved: data.approved ?? true,
+          role: data.role || 'member',
           approvedBy: data.approvedBy,
           approvedAt: data.approvedAt?.toDate(),
           createdAt: data.createdAt?.toDate(),
         };
       });
 
-      // Ordenar: primero pendientes, luego aprobados
+      // Ordenar: primero pendientes, luego miembros, luego colaboradores
       usersData.sort((a, b) => {
-        if (a.approved === b.approved) return 0;
-        return a.approved ? 1 : -1;
+        if (a.approved !== b.approved) return a.approved ? 1 : -1;
+        if (a.role !== b.role) return a.role === 'member' ? -1 : 1;
+        return 0;
       });
 
       setUsers(usersData);
@@ -103,7 +112,7 @@ export default function UserApprovalManager() {
     return () => unsubscribe();
   }, []);
 
-  const handleApprove = async (userId: string) => {
+  const handleApprove = async (userId: string, role: UserRole) => {
     if (!currentUser) return;
 
     setProcessingId(userId);
@@ -111,12 +120,27 @@ export default function UserApprovalManager() {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
         approved: true,
+        role: role,
         approvedBy: currentUser.id,
         approvedAt: serverTimestamp(),
       });
-      console.log('Usuario aprobado');
+      console.log('Usuario aprobado como', role);
     } catch (error) {
       console.error('Error al aprobar usuario:', error);
+    } finally {
+      setProcessingId(null);
+      setShowRoleSelector(null);
+    }
+  };
+
+  const handleChangeRole = async (userId: string, newRole: UserRole) => {
+    setProcessingId(userId);
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, { role: newRole });
+      console.log('Rol cambiado a', newRole);
+    } catch (error) {
+      console.error('Error al cambiar rol:', error);
     } finally {
       setProcessingId(null);
     }
@@ -137,11 +161,8 @@ export default function UserApprovalManager() {
   };
 
   const handleRemoveUser = async (userId: string) => {
-    // Verificar que no tenga transacciones
     const userTx = transactionsByUser.get(userId);
-    if (userTx && userTx.total > 0) {
-      return; // No debería llegar aquí, pero por seguridad
-    }
+    if (userTx && userTx.total > 0) return;
 
     setProcessingId(userId);
     try {
@@ -157,25 +178,34 @@ export default function UserApprovalManager() {
   };
 
   const pendingUsers = users.filter(u => !u.approved);
-  const approvedUsers = users.filter(u => u.approved);
-
-  const getApproverName = (approverId?: string) => {
-    if (!approverId) return null;
-    const approver = users.find(u => u.id === approverId);
-    return approver?.name || 'Usuario';
-  };
+  const memberUsers = users.filter(u => u.approved && u.role === 'member');
+  const collaboratorUsers = users.filter(u => u.approved && u.role === 'collaborator');
 
   const canDeleteUser = (userId: string) => {
-    // No puede eliminarse a sí mismo
     if (userId === currentUser?.id) return false;
-
-    // No puede eliminar si tiene transacciones
     const userTx = transactionsByUser.get(userId);
     return !userTx || userTx.total === 0;
   };
 
   const getUserTransactionInfo = (userId: string) => {
     return transactionsByUser.get(userId) || { contributions: 0, expenses: 0, total: 0 };
+  };
+
+  const getRoleBadge = (role: UserRole) => {
+    if (role === 'member') {
+      return (
+        <div className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[10px] font-medium px-2 py-1 rounded-full">
+          <Crown className="w-3 h-3" />
+          Miembro
+        </div>
+      );
+    }
+    return (
+      <div className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-[10px] font-medium px-2 py-1 rounded-full">
+        <Heart className="w-3 h-3" />
+        Colaborador
+      </div>
+    );
   };
 
   return (
@@ -191,7 +221,7 @@ export default function UserApprovalManager() {
         </button>
         <div className="flex-1">
           <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Control de Acceso</h1>
-          <p className="text-xs lg:text-sm text-gray-500">Gestiona quién puede usar la app</p>
+          <p className="text-xs lg:text-sm text-gray-500">Gestiona usuarios y roles</p>
         </div>
         <div className="p-2 bg-emerald-100 rounded-full">
           <Shield className="w-5 h-5 text-emerald-600" />
@@ -242,28 +272,93 @@ export default function UserApprovalManager() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => handleApprove(user.id)}
-                      disabled={processingId === user.id}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-[0.98] disabled:opacity-50"
-                    >
-                      {processingId === user.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
+                  {/* Selector de rol para aprobar */}
+                  {showRoleSelector === user.id ? (
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <p className="text-sm font-medium text-blue-800 mb-3">¿Cómo quieres aprobar a {user.name}?</p>
+
+                      <div className="space-y-2 mb-4">
+                        <button
+                          onClick={() => setPendingApprovalRole('member')}
+                          className={cn(
+                            "w-full p-3 rounded-lg border-2 text-left transition-all",
+                            pendingApprovalRole === 'member'
+                              ? "border-blue-500 bg-blue-100"
+                              : "border-gray-200 bg-white hover:border-blue-300"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Crown className={cn("w-4 h-4", pendingApprovalRole === 'member' ? "text-blue-600" : "text-gray-400")} />
+                            <span className="font-medium text-gray-900">Miembro</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 ml-6">
+                            Participa en la división de gastos (como los 4 hermanos)
+                          </p>
+                        </button>
+
+                        <button
+                          onClick={() => setPendingApprovalRole('collaborator')}
+                          className={cn(
+                            "w-full p-3 rounded-lg border-2 text-left transition-all",
+                            pendingApprovalRole === 'collaborator'
+                              ? "border-purple-500 bg-purple-100"
+                              : "border-gray-200 bg-white hover:border-purple-300"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Heart className={cn("w-4 h-4", pendingApprovalRole === 'collaborator' ? "text-purple-600" : "text-gray-400")} />
+                            <span className="font-medium text-gray-900">Colaborador</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 ml-6">
+                            Solo puede aportar, no tiene cuota de gastos (ej: padres)
+                          </p>
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowRoleSelector(null)}
+                          className="flex-1 bg-white border border-gray-200 text-gray-700 font-medium py-2.5 rounded-lg"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handleApprove(user.id, pendingApprovalRole)}
+                          disabled={processingId === user.id}
+                          className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2"
+                        >
+                          {processingId === user.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <UserCheck className="w-4 h-4" />
+                          )}
+                          Aprobar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => {
+                          setShowRoleSelector(user.id);
+                          setPendingApprovalRole('member');
+                        }}
+                        disabled={processingId === user.id}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-[0.98] disabled:opacity-50"
+                      >
                         <UserCheck className="w-4 h-4" />
-                      )}
-                      Aprobar
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(user.id)}
-                      disabled={processingId === user.id}
-                      className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-[0.98] disabled:opacity-50"
-                    >
-                      <UserX className="w-4 h-4" />
-                      Rechazar
-                    </button>
-                  </div>
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(user.id)}
+                        disabled={processingId === user.id}
+                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <UserX className="w-4 h-4" />
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
 
                   {showDeleteConfirm === user.id && (
                     <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3">
@@ -307,18 +402,19 @@ export default function UserApprovalManager() {
           </div>
         )}
 
-        {/* --- USUARIOS APROBADOS --- */}
-        {!loading && approvedUsers.length > 0 && (
+        {/* --- MIEMBROS (dividen gastos) --- */}
+        {!loading && memberUsers.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3 ml-2">
-              <Users className="w-4 h-4 text-gray-400" />
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Miembros Activos ({approvedUsers.length})
+              <Crown className="w-4 h-4 text-blue-500" />
+              <h2 className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                Miembros ({memberUsers.length})
               </h2>
+              <span className="text-[10px] text-gray-400 ml-1">• Dividen gastos equitativamente</span>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-              {approvedUsers.map((user) => {
+              {memberUsers.map((user) => {
                 const isCurrentUser = user.id === currentUser?.id;
                 const canDelete = canDeleteUser(user.id);
                 const txInfo = getUserTransactionInfo(user.id);
@@ -332,17 +428,13 @@ export default function UserApprovalManager() {
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      {/* Avatar */}
                       <div className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0",
-                        isCurrentUser
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-200 text-gray-600"
+                        isCurrentUser ? "bg-blue-500 text-white" : "bg-blue-100 text-blue-700"
                       )}>
                         {user.name.charAt(0).toUpperCase()}
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className={cn(
                           "font-medium text-sm truncate",
@@ -351,8 +443,6 @@ export default function UserApprovalManager() {
                           {user.name} {isCurrentUser && '(Tú)'}
                         </p>
                         <p className="text-xs text-gray-400 truncate">{user.email}</p>
-
-                        {/* Info de transacciones */}
                         {txInfo.total > 0 && (
                           <p className="text-[10px] text-gray-400 mt-1">
                             {txInfo.total} transacciones • Aportes: {formatCurrency(txInfo.contributions)}
@@ -360,43 +450,45 @@ export default function UserApprovalManager() {
                         )}
                       </div>
 
-                      {/* Acciones */}
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-medium px-2 py-1 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Activo
-                        </div>
+                        {getRoleBadge(user.role)}
 
-                        {/* Botón eliminar (solo si puede) */}
                         {!isCurrentUser && (
-                          <button
-                            onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
-                            disabled={!canDelete}
-                            className={cn(
-                              "p-2 rounded-lg transition-colors",
-                              canDelete
-                                ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                : "text-gray-300 cursor-not-allowed"
-                            )}
-                            title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleChangeRole(user.id, 'collaborator')}
+                              disabled={processingId === user.id}
+                              className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Cambiar a Colaborador"
+                            >
+                              <UserCog className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
+                              disabled={!canDelete}
+                              className={cn(
+                                "p-2 rounded-lg transition-colors",
+                                canDelete
+                                  ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                  : "text-gray-300 cursor-not-allowed"
+                              )}
+                              title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
 
-                    {/* Confirmación de eliminación */}
                     {showRemoveUserConfirm === user.id && (
                       <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3">
                         <div className="flex items-start gap-2 mb-3">
                           <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-xs text-red-700 font-medium">
-                              ¿Eliminar a {user.name}?
-                            </p>
+                            <p className="text-xs text-red-700 font-medium">¿Eliminar a {user.name}?</p>
                             <p className="text-[10px] text-red-600 mt-1">
-                              Este usuario no tiene transacciones registradas, por lo que puede ser eliminado sin afectar los cálculos.
+                              Este usuario no tiene transacciones registradas.
                             </p>
                           </div>
                         </div>
@@ -423,14 +515,131 @@ export default function UserApprovalManager() {
                       </div>
                     )}
 
-                    {/* Info de por qué no se puede eliminar */}
-                    {!isCurrentUser && !canDelete && showRemoveUserConfirm !== user.id && (
-                      <div className="mt-2 ml-13">
-                        <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                          <XCircle className="w-3 h-3" />
-                          No eliminable: tiene {txInfo.total} transacciones
-                        </p>
+                    {!isCurrentUser && !canDelete && (
+                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-2 ml-13">
+                        <XCircle className="w-3 h-3" />
+                        No eliminable: tiene {txInfo.total} transacciones
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* --- COLABORADORES (solo aportan) --- */}
+        {!loading && collaboratorUsers.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3 ml-2">
+              <Heart className="w-4 h-4 text-purple-500" />
+              <h2 className="text-xs font-bold text-purple-600 uppercase tracking-wider">
+                Colaboradores ({collaboratorUsers.length})
+              </h2>
+              <span className="text-[10px] text-gray-400 ml-1">• Solo aportan, sin cuota</span>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+              {collaboratorUsers.map((user) => {
+                const isCurrentUser = user.id === currentUser?.id;
+                const canDelete = canDeleteUser(user.id);
+                const txInfo = getUserTransactionInfo(user.id);
+
+                return (
+                  <div
+                    key={user.id}
+                    className={cn(
+                      "p-4",
+                      isCurrentUser && "bg-purple-50/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 bg-purple-100 text-purple-700">
+                        {user.name.charAt(0).toUpperCase()}
                       </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate text-gray-900">
+                          {user.name} {isCurrentUser && '(Tú)'}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        {txInfo.contributions > 0 && (
+                          <p className="text-[10px] text-purple-500 mt-1">
+                            Ha aportado: {formatCurrency(txInfo.contributions)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {getRoleBadge(user.role)}
+
+                        {!isCurrentUser && (
+                          <>
+                            <button
+                              onClick={() => handleChangeRole(user.id, 'member')}
+                              disabled={processingId === user.id}
+                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Cambiar a Miembro"
+                            >
+                              <UserCog className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
+                              disabled={!canDelete}
+                              className={cn(
+                                "p-2 rounded-lg transition-colors",
+                                canDelete
+                                  ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                  : "text-gray-300 cursor-not-allowed"
+                              )}
+                              title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {showRemoveUserConfirm === user.id && (
+                      <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                        <div className="flex items-start gap-2 mb-3">
+                          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-red-700 font-medium">¿Eliminar a {user.name}?</p>
+                            <p className="text-[10px] text-red-600 mt-1">
+                              Este usuario no tiene transacciones registradas.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowRemoveUserConfirm(null)}
+                            className="flex-1 bg-white border border-gray-200 text-gray-700 text-sm font-medium py-2 rounded-lg"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => handleRemoveUser(user.id)}
+                            disabled={processingId === user.id}
+                            className="flex-1 bg-red-600 text-white text-sm font-medium py-2 rounded-lg flex items-center justify-center gap-1"
+                          >
+                            {processingId === user.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isCurrentUser && !canDelete && (
+                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-2 ml-13">
+                        <XCircle className="w-3 h-3" />
+                        No eliminable: tiene {txInfo.total} transacciones
+                      </p>
                     )}
                   </div>
                 );
@@ -444,14 +653,19 @@ export default function UserApprovalManager() {
           <div className="flex gap-3">
             <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-blue-800 mb-1">
-                Sobre el control de acceso
+              <p className="text-sm font-medium text-blue-800 mb-2">
+                Tipos de usuarios
               </p>
-              <ul className="text-xs text-blue-600 space-y-1">
-                <li>• Nuevos usuarios quedan pendientes hasta ser aprobados</li>
-                <li>• Solo se pueden eliminar usuarios sin transacciones</li>
-                <li>• Los usuarios con aportes o gastos no pueden ser eliminados para mantener la integridad de los datos</li>
-              </ul>
+              <div className="space-y-2 text-xs text-blue-600">
+                <div className="flex items-start gap-2">
+                  <Crown className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <p><strong>Miembros:</strong> Dividen los gastos equitativamente. Su cuota = Total gastos ÷ N° de miembros</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Heart className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <p><strong>Colaboradores:</strong> Pueden aportar dinero pero no tienen cuota de gastos. Ideal para padres u otros familiares que ayudan ocasionalmente.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
