@@ -14,7 +14,8 @@ import {
   Shield,
   Bell,
   ListTodo,
-  UserCheck
+  UserCheck,
+  HardDrive
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -77,6 +78,13 @@ export default function Settings() {
       icon: ListTodo,
       path: '/settings/tasks',
       color: 'bg-teal-500',
+    },
+    {
+      id: 'backup',
+      label: 'Copias de Seguridad',
+      icon: HardDrive,
+      path: '/settings/backup',
+      color: 'bg-blue-500',
     },
   ];
 

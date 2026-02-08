@@ -13,8 +13,6 @@ import {
   CheckCheck,
   AlertTriangle,
   Pencil,
-  Check,
-  X,
   Calendar
 } from 'lucide-react';
 import type { Task } from '../types';
@@ -61,11 +59,15 @@ export default function TasksManager() {
   const [addingTask, setAddingTask] = useState(false);
   const [error, setError] = useState('');
 
-  // Estado para edición
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  // Estado para modal de edición
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Estado para confirmación de eliminación
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Suscripción en tiempo real a todas las tareas
   useEffect(() => {
@@ -79,13 +81,16 @@ export default function TasksManager() {
     return () => unsubscribe();
   }, [user]);
 
-  // Focus en el input de edición cuando se activa
+  // Focus en el input de edición cuando se abre el modal
   useEffect(() => {
-    if (editingTaskId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+    if (editingTask && editInputRef.current) {
+      // Pequeño delay para asegurar que el modal esté renderizado
+      setTimeout(() => {
+        editInputRef.current?.focus();
+        editInputRef.current?.select();
+      }, 100);
     }
-  }, [editingTaskId]);
+  }, [editingTask]);
 
   const handleAddTask = async (e: FormEvent) => {
     e.preventDefault();
@@ -112,31 +117,37 @@ export default function TasksManager() {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    setDeleting(true);
     try {
-      await deleteTask(taskId);
+      await deleteTask(taskToDelete.id);
+      setTaskToDelete(null);
     } catch (err) {
       console.error('Error al eliminar tarea:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
   const startEditing = (task: Task) => {
-    setEditingTaskId(task.id);
+    setEditingTask(task);
     setEditingTitle(task.title);
   };
 
   const cancelEditing = () => {
-    setEditingTaskId(null);
+    setEditingTask(null);
     setEditingTitle('');
   };
 
   const handleSaveEdit = async () => {
-    if (!editingTaskId || !editingTitle.trim()) return;
+    if (!editingTask || !editingTitle.trim()) return;
 
     setSavingEdit(true);
     try {
-      await updateTaskTitle(editingTaskId, editingTitle.trim());
-      setEditingTaskId(null);
+      await updateTaskTitle(editingTask.id, editingTitle.trim());
+      setEditingTask(null);
       setEditingTitle('');
     } catch (err) {
       console.error('Error al actualizar título:', err);
@@ -147,6 +158,7 @@ export default function TasksManager() {
 
   const handleEditKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSaveEdit();
     } else if (e.key === 'Escape') {
       cancelEditing();
@@ -163,8 +175,6 @@ export default function TasksManager() {
 
   // Componente de tarea individual
   const TaskItem = ({ task, isCompleted }: { task: Task; isCompleted: boolean }) => {
-    const isEditing = editingTaskId === task.id;
-
     return (
       <div className="p-4 flex flex-col gap-2 hover:bg-gray-50 transition-colors group">
         <div className="flex items-center gap-3">
@@ -180,70 +190,40 @@ export default function TasksManager() {
             )}
           </button>
 
-          {/* Título o Input de edición */}
-          {isEditing ? (
-            <div className="flex-1 flex items-center gap-2">
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editingTitle}
-                onChange={(e) => setEditingTitle(e.target.value)}
-                onKeyDown={handleEditKeyDown}
-                className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                disabled={savingEdit}
-              />
-              <button
-                onClick={handleSaveEdit}
-                disabled={savingEdit || !editingTitle.trim()}
-                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {savingEdit ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-              </button>
-              <button
-                onClick={cancelEditing}
-                className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className={`flex-1 text-sm ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}>
-                {task.title}
-              </p>
+          {/* Título */}
+          <p className={`flex-1 text-sm ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}>
+            {task.title}
+          </p>
 
-              {/* Botón Editar */}
-              {!isCompleted && (
-                <button
-                  onClick={() => startEditing(task)}
-                  className="flex-shrink-0 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* Botón Eliminar */}
+          {/* Botones de acción - siempre visibles en móvil, hover en desktop */}
+          <div className="flex items-center gap-1">
+            {/* Botón Editar */}
+            {!isCompleted && (
               <button
-                onClick={() => handleDeleteTask(task.id)}
-                className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                onClick={() => startEditing(task)}
+                className="flex-shrink-0 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                aria-label="Editar tarea"
               >
-                <Trash2 className="w-4 h-4" />
+                <Pencil className="w-4 h-4" />
               </button>
-            </>
-          )}
+            )}
+
+            {/* Botón Eliminar */}
+            <button
+              onClick={() => setTaskToDelete(task)}
+              className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+              aria-label="Eliminar tarea"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Creador de la tarea - dato secundario sutil */}
-        {!isEditing && (
-          <div className="ml-10 flex items-center gap-1.5 text-[11px] text-gray-400">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-            <span>{task.createdByName}</span>
-          </div>
-        )}
+        <div className="ml-10 flex items-center gap-1.5 text-[11px] text-gray-400">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+          <span>{task.createdByName}</span>
+        </div>
       </div>
     );
   };
@@ -380,6 +360,115 @@ export default function TasksManager() {
         )}
 
       </div>
+
+      {/* --- MODAL DE EDICIÓN --- */}
+      {editingTask && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={cancelEditing}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
+            {/* Handle para móvil */}
+            <div className="sm:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Editar tarea
+              </h3>
+
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                placeholder="Título de la tarea..."
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                disabled={savingEdit}
+              />
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={cancelEditing}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit || !editingTitle.trim()}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    'Guardar'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN --- */}
+      {taskToDelete && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setTaskToDelete(null)}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
+            {/* Handle para móvil */}
+            <div className="sm:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-7 h-7 text-red-600" />
+              </div>
+
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                ¿Eliminar tarea?
+              </h3>
+
+              <p className="text-sm text-gray-500 mb-6">
+                "{taskToDelete.title}"
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setTaskToDelete(null)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteTask}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    'Eliminar'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

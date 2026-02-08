@@ -136,8 +136,26 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     };
   });
 
+  // Separar miembros de colaboradores
+  const members = users.filter((u) => u.role === 'member' || u.role === undefined);
+  const collaborators = users.filter((u) => u.role === 'collaborator');
+
+  // Stats solo de miembros (para división de gastos)
+  const memberStats = userStats.filter((stat) => {
+    const user = users.find((u) => u.id === stat.userId);
+    return user?.role === 'member' || user?.role === undefined;
+  });
+
+  // Stats solo de colaboradores
+  const collaboratorStats = userStats.filter((stat) => {
+    const user = users.find((u) => u.id === stat.userId);
+    return user?.role === 'collaborator';
+  });
+
   return {
     users,
+    members,
+    collaborators,
     projects,
     categories,
     transactions,
@@ -145,6 +163,9 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     totalContributions,
     totalExpenses,
     userStats,
+    memberStats,
+    collaboratorStats,
+    memberCount,
     projectStats,
     loading,
   };

@@ -64,13 +64,18 @@ export interface ProjectStats {
 
 export interface DashboardData {
   users: User[];
+  members: User[]; // Solo usuarios con role='member'
+  collaborators: User[]; // Solo usuarios con role='collaborator'
   projects: Project[];
   categories: Category[];
   transactions: Transaction[];
   totalInBox: number; // Total aportes - Total gastos
   totalContributions: number; // Total de aportes
   totalExpenses: number; // Total de gastos
-  userStats: UserStats[];
+  userStats: UserStats[]; // Todos los usuarios
+  memberStats: UserStats[]; // Solo miembros (para división de gastos)
+  collaboratorStats: UserStats[]; // Solo colaboradores
+  memberCount: number; // Cantidad de miembros (para división)
   projectStats: ProjectStats[];
 }
 

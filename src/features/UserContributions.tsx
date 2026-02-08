@@ -17,7 +17,7 @@ import ContributionForm from './ContributionForm';
 export default function UserContributions() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { users, userStats, transactions, projects } = useDashboardData();
+  const { users, userStats, transactions, projects, memberCount } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
 
   const [showContributionForm, setShowContributionForm] = useState(false);
@@ -27,6 +27,9 @@ export default function UserContributions() {
   const targetUser = useMemo(() => {
     return users.find(u => u.id === userId);
   }, [users, userId]);
+
+  // Verificar si es colaborador
+  const isCollaborator = targetUser?.role === 'collaborator';
 
   // Estadísticas del usuario
   const targetUserStats = useMemo(() => {
@@ -55,17 +58,20 @@ export default function UserContributions() {
     }, 0);
   }, [projects, transactions]);
 
-  // Calcular cuánto le corresponde a cada usuario
+  // Calcular cuánto le corresponde a cada MIEMBRO (no colaboradores)
   const expectedContribution = useMemo(() => {
-    const numberOfUsers = userStats.length || 4;
-    return effectiveBudgetTotal / numberOfUsers;
-  }, [effectiveBudgetTotal, userStats.length]);
+    // Los colaboradores no tienen meta de aportes
+    if (isCollaborator) return 0;
+    const numberOfMembers = memberCount || 4;
+    return effectiveBudgetTotal / numberOfMembers;
+  }, [effectiveBudgetTotal, memberCount, isCollaborator]);
 
-  // Porcentaje de progreso
+  // Porcentaje de progreso (100% para colaboradores ya que no tienen meta)
   const progressPercentage = useMemo(() => {
+    if (isCollaborator) return 100; // Colaboradores siempre al 100%
     if (!targetUserStats || expectedContribution === 0) return 0;
     return Math.min(100, (targetUserStats.totalContributed / expectedContribution) * 100);
-  }, [targetUserStats, expectedContribution]);
+  }, [targetUserStats, expectedContribution, isCollaborator]);
 
   const handleEditContribution = (contribution: typeof transactions[0]) => {
     setTransactionToEdit(contribution);
@@ -111,6 +117,7 @@ export default function UserContributions() {
           <div className="flex items-center gap-3 flex-1">
             <div className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold",
+              isCollaborator ? "bg-purple-100 text-purple-700" :
               isCurrentUser ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-700"
             )}>
               {targetUser.name.charAt(0)}
@@ -119,7 +126,12 @@ export default function UserContributions() {
               <h1 className="text-lg lg:text-xl font-bold text-gray-900">
                 {targetUser.name} {isCurrentUser && '(Tú)'}
               </h1>
-              <p className="text-xs text-gray-500">Historial de aportes</p>
+              <p className={cn(
+                "text-xs",
+                isCollaborator ? "text-purple-500" : "text-gray-500"
+              )}>
+                {isCollaborator ? 'Colaborador • Historial de aportes' : 'Historial de aportes'}
+              </p>
             </div>
           </div>
         </div>
@@ -130,6 +142,7 @@ export default function UserContributions() {
         {/* --- TARJETA DE RESUMEN --- */}
         <div className={cn(
           "relative overflow-hidden rounded-2xl p-5 text-white shadow-lg",
+          isCollaborator ? "bg-gradient-to-br from-purple-500 to-purple-700" :
           progressPercentage >= 100 ? "bg-gradient-to-br from-emerald-500 to-teal-600" :
           progressPercentage >= 50 ? "bg-gradient-to-br from-blue-500 to-indigo-600" :
           "bg-gradient-to-br from-amber-500 to-orange-600"
@@ -140,33 +153,48 @@ export default function UserContributions() {
             <div className="flex items-center gap-2 opacity-90 mb-1">
               <Wallet className="w-4 h-4" />
               <span className="text-sm font-medium">Total Aportado</span>
+              {isCollaborator && (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Colaborador</span>
+              )}
             </div>
 
             <p className="text-3xl font-bold tracking-tight mb-3">
               {formatCurrency(targetUserStats.totalContributed)}
             </p>
 
-            {/* Mini stats */}
-            <div className="grid grid-cols-2 gap-3 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider opacity-70">Meta esperada</p>
-                <p className="font-semibold">{formatCurrency(expectedContribution)}</p>
+            {/* Mini stats - diferentes para colaboradores */}
+            {isCollaborator ? (
+              <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+                <p className="text-[10px] uppercase tracking-wider opacity-70">Estado</p>
+                <p className="font-semibold">No participa en división de gastos</p>
+                <p className="text-xs opacity-70 mt-1">
+                  Los aportes de colaboradores van directamente a la caja común
+                </p>
               </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider opacity-70">Progreso</p>
-                <p className="font-semibold">{progressPercentage.toFixed(0)}%</p>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider opacity-70">Meta esperada</p>
+                    <p className="font-semibold">{formatCurrency(expectedContribution)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider opacity-70">Progreso</p>
+                    <p className="font-semibold">{progressPercentage.toFixed(0)}%</p>
+                  </div>
+                </div>
 
-            {/* Barra de progreso */}
-            <div className="mt-3">
-              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white/90 transition-all duration-500 rounded-full"
-                  style={{ width: `${Math.min(100, progressPercentage)}%` }}
-                />
-              </div>
-            </div>
+                {/* Barra de progreso - solo para miembros */}
+                <div className="mt-3">
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white/90 transition-all duration-500 rounded-full"
+                      style={{ width: `${Math.min(100, progressPercentage)}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

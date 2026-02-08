@@ -13,8 +13,11 @@ import ContributionForm from './ContributionForm';
 import NotificationButton from '../components/NotificationButton';
 
 export default function Balance() {
-  const { userStats, transactions, totalExpenses, totalInBox, projects } = useDashboardData();
+  const { userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount } = useDashboardData();
   const user = useAuthStore((state) => state.user);
+
+  // Verificar si el usuario actual es colaborador
+  const isCollaborator = user?.role === 'collaborator';
 
   // Estado simple para simular la UI de búsqueda (listo para conectar tu lógica)
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,11 +67,13 @@ export default function Balance() {
     }, 0);
   }, [projects, transactions]);
 
-  // Calcular cuánto le corresponde a cada usuario
+  // Calcular cuánto le corresponde a cada MIEMBRO (no colaboradores)
   const expectedContribution = useMemo(() => {
-    const numberOfUsers = userStats.length || 4;
-    return effectiveBudgetTotal / numberOfUsers;
-  }, [effectiveBudgetTotal, userStats.length]);
+    // Si el usuario es colaborador, no tiene meta de aportes
+    if (isCollaborator) return 0;
+    const numberOfMembers = memberCount || 4;
+    return effectiveBudgetTotal / numberOfMembers;
+  }, [effectiveBudgetTotal, memberCount, isCollaborator]);
 
   // Cuánto falta por aportar para llegar a la meta
   const remainingToGoal = useMemo(() => {
@@ -292,23 +297,23 @@ export default function Balance() {
           </div>
         </div>
 
-        {/* --- LISTA DE MIEMBROS (Diseño de Filas/Rows) --- */}
+        {/* --- LISTA DE MIEMBROS (Solo los que dividen gastos) --- */}
         <div>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-bold text-gray-800 text-lg">Estado del Grupo</h3>
             <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-              {userStats.length} miembros
+              {memberStats.length} miembros
             </span>
           </div>
-          
+
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            {userStats.map((stats, index) => {
+            {memberStats.map((stats, index) => {
               const isCurrentUser = stats.userId === user.id;
               const userIsInDebt = stats.balance < 0;
-              const isLast = index === userStats.length - 1;
+              const isLast = index === memberStats.length - 1;
 
               return (
-                <div 
+                <div
                   key={stats.userId}
                   className={cn(
                     "flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
@@ -353,6 +358,63 @@ export default function Balance() {
             })}
           </div>
         </div>
+
+        {/* --- COLABORADORES (Si hay alguno) --- */}
+        {collaboratorStats.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h3 className="font-bold text-gray-800 text-lg">Colaboradores</h3>
+              <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                {collaboratorStats.length} {collaboratorStats.length === 1 ? 'persona' : 'personas'}
+              </span>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {collaboratorStats.map((stats, index) => {
+                const isCurrentUser = stats.userId === user.id;
+                const isLast = index === collaboratorStats.length - 1;
+
+                return (
+                  <div
+                    key={stats.userId}
+                    className={cn(
+                      "flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
+                      !isLast && "border-b border-gray-50",
+                      isCurrentUser && "bg-purple-50/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar con icono de colaborador */}
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold",
+                        isCurrentUser ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"
+                      )}>
+                        {stats.userName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className={cn("text-sm font-semibold", isCurrentUser ? "text-purple-900" : "text-gray-900")}>
+                          {stats.userName} {isCurrentUser && '(Tú)'}
+                        </p>
+                        <p className="text-xs text-purple-500">
+                          Colaborador • No divide gastos
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-sm font-bold block text-emerald-600">
+                        +{formatCurrency(stats.totalContributed)}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium bg-emerald-50 text-emerald-600">
+                        Aportado
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* --- HISTORIAL (Compacto) --- */}
         <div>

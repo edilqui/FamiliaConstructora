@@ -20,7 +20,7 @@ import { es } from 'date-fns/locale';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { projects, categories, transactions, totalInBox, userStats, projectStats, loading } = useDashboardData();
+  const { projects, categories, transactions, totalInBox, userStats, memberStats, collaboratorStats, memberCount, projectStats, loading } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
 
   // Estados de Modales
@@ -78,8 +78,9 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value).slice(0, 5);
   }, [filteredExpenses, categories]);
 
-  // Cálculo de progreso de aportes por usuario basado en presupuestos
-  const userContributionProgress = useMemo(() => {
+  // Cálculo de progreso de aportes por MIEMBRO basado en presupuestos
+  // Los colaboradores no participan en la división de gastos
+  const memberContributionProgress = useMemo(() => {
     // Calcular presupuesto efectivo por proyecto
     // Si un proyecto tiene budget = 0, usar la suma de sus gastos
     const effectiveBudgetTotal = projects.reduce((sum, project) => {
@@ -94,13 +95,13 @@ export default function Dashboard() {
       }
     }, 0);
 
-    // Calcular cuánto le corresponde a cada usuario (dividir equitativamente)
-    const numberOfUsers = userStats.length || 4;
-    const expectedPerUser = effectiveBudgetTotal / numberOfUsers;
+    // Calcular cuánto le corresponde a cada MIEMBRO (no colaboradores)
+    const numberOfMembers = memberCount || 4;
+    const expectedPerMember = effectiveBudgetTotal / numberOfMembers;
 
-    return userStats.map(stats => {
+    return memberStats.map(stats => {
       const contributed = stats.totalContributed;
-      const expected = expectedPerUser;
+      const expected = expectedPerMember;
       const remaining = Math.max(0, expected - contributed);
       const percentage = expected > 0 ? (contributed / expected) * 100 : 0;
 
@@ -112,9 +113,24 @@ export default function Dashboard() {
         expected,
         percentage: Math.min(100, percentage), // Cap at 100%
         isCurrentUser: stats.userId === currentUser?.id,
+        isCollaborator: false,
       };
     }).sort((a, b) => b.percentage - a.percentage); // Ordenar por porcentaje descendente
-  }, [userStats, projects, transactions, currentUser]);
+  }, [memberStats, memberCount, projects, transactions, currentUser]);
+
+  // Progreso de colaboradores (solo muestran lo aportado, sin meta)
+  const collaboratorContributionProgress = useMemo(() => {
+    return collaboratorStats.map(stats => ({
+      userId: stats.userId,
+      name: stats.userName,
+      contributed: stats.totalContributed,
+      remaining: 0,
+      expected: 0,
+      percentage: 100, // Siempre al 100% porque no tienen meta
+      isCurrentUser: stats.userId === currentUser?.id,
+      isCollaborator: true,
+    }));
+  }, [collaboratorStats, currentUser]);
 
   const toggleProject = (projectId: string) => {
     setSelectedProjects(prev => prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]);
@@ -289,7 +305,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Gráfico de Progreso de Aportes por Usuario */}
+            {/* Gráfico de Progreso de Aportes por Miembro */}
             <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
@@ -306,13 +322,13 @@ export default function Dashboard() {
                           .reduce((expSum, t) => expSum + t.amount, 0);
                         return sum + projectExpenses;
                       }, 0)
-                    )})
+                    )}) ÷ {memberCount} miembros
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-                {userContributionProgress.map((user, index) => (
+                {memberContributionProgress.map((user, index) => (
                   <button
                     key={index}
                     onClick={() => navigate(`/user/${user.userId}/contributions`)}
@@ -373,6 +389,57 @@ export default function Dashboard() {
                 ))}
               </div>
 
+              {/* Colaboradores (si hay) */}
+              {collaboratorContributionProgress.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-3">
+                    Colaboradores
+                  </p>
+                  <div className="space-y-2">
+                    {collaboratorContributionProgress.map((user, index) => (
+                      <button
+                        key={index}
+                        onClick={() => navigate(`/user/${user.userId}/contributions`)}
+                        className={cn(
+                          "p-3 rounded-xl border transition-all w-full text-left hover:shadow-md hover:scale-[1.01] active:scale-[0.99]",
+                          user.isCurrentUser ? "bg-purple-50/50 border-purple-200 hover:border-purple-300" : "bg-gray-50 border-gray-100 hover:border-gray-200"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold",
+                              user.isCurrentUser ? "bg-purple-600 text-white" : "bg-purple-100 text-purple-700"
+                            )}>
+                              {user.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className={cn(
+                                "text-sm font-bold",
+                                user.isCurrentUser ? "text-purple-900" : "text-gray-800"
+                              )}>
+                                {user.name} {user.isCurrentUser && '(Tú)'}
+                              </p>
+                              <p className="text-[10px] text-purple-500">
+                                No participa en división de gastos
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-emerald-600">
+                              +{formatCurrency(user.contributed)}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              Aportado
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Info adicional */}
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -388,6 +455,12 @@ export default function Dashboard() {
                     <div className="w-2 h-2 rounded-full bg-amber-500" />
                     <span>&lt;50%</span>
                   </div>
+                  {collaboratorContributionProgress.length > 0 && (
+                    <div className="flex items-center gap-1 ml-2">
+                      <div className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span>Colaborador</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

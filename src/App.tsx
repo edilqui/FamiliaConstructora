@@ -13,6 +13,7 @@ import TasksManager from './features/TasksManager';
 import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
+import BackupManager from './features/BackupManager';
 import PendingApproval from './features/PendingApproval';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
@@ -183,6 +184,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <UserApprovalManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/backup"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <BackupManager />
               </Layout>
             </ProtectedRoute>
           }
