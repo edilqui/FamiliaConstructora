@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { useDashboardData } from '../hooks/useDashboardData';
 import {
   collection,
   query,
@@ -21,9 +22,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   Users,
-  Trash2
+  Trash2,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -40,11 +43,34 @@ interface UserData {
 export default function UserApprovalManager() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const { transactions } = useDashboardData();
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showRemoveUserConfirm, setShowRemoveUserConfirm] = useState<string | null>(null);
+
+  // Calcular transacciones por usuario
+  const transactionsByUser = useMemo(() => {
+    const map = new Map<string, { contributions: number; expenses: number; total: number }>();
+
+    transactions.forEach(t => {
+      const userId = t.userId;
+      const current = map.get(userId) || { contributions: 0, expenses: 0, total: 0 };
+
+      if (t.type === 'contribution') {
+        current.contributions += t.amount;
+      } else {
+        current.expenses += t.amount;
+      }
+      current.total++;
+
+      map.set(userId, current);
+    });
+
+    return map;
+  }, [transactions]);
 
   // Suscripción a usuarios en tiempo real
   useEffect(() => {
@@ -57,7 +83,7 @@ export default function UserApprovalManager() {
           id: doc.id,
           name: data.name,
           email: data.email,
-          approved: data.approved ?? true, // Si no tiene el campo, asumimos aprobado
+          approved: data.approved ?? true,
           approvedBy: data.approvedBy,
           approvedAt: data.approvedAt?.toDate(),
           createdAt: data.createdAt?.toDate(),
@@ -99,7 +125,6 @@ export default function UserApprovalManager() {
   const handleReject = async (userId: string) => {
     setProcessingId(userId);
     try {
-      // Eliminar el usuario de Firestore (no podrá acceder)
       const userRef = doc(db, 'users', userId);
       await deleteDoc(userRef);
       console.log('Usuario rechazado y eliminado');
@@ -111,14 +136,46 @@ export default function UserApprovalManager() {
     }
   };
 
+  const handleRemoveUser = async (userId: string) => {
+    // Verificar que no tenga transacciones
+    const userTx = transactionsByUser.get(userId);
+    if (userTx && userTx.total > 0) {
+      return; // No debería llegar aquí, pero por seguridad
+    }
+
+    setProcessingId(userId);
+    try {
+      const userRef = doc(db, 'users', userId);
+      await deleteDoc(userRef);
+      console.log('Usuario eliminado');
+    } catch (error) {
+      console.error('Error al eliminar usuario:', error);
+    } finally {
+      setProcessingId(null);
+      setShowRemoveUserConfirm(null);
+    }
+  };
+
   const pendingUsers = users.filter(u => !u.approved);
   const approvedUsers = users.filter(u => u.approved);
 
-  // Encontrar el nombre del usuario que aprobó
   const getApproverName = (approverId?: string) => {
     if (!approverId) return null;
     const approver = users.find(u => u.id === approverId);
     return approver?.name || 'Usuario';
+  };
+
+  const canDeleteUser = (userId: string) => {
+    // No puede eliminarse a sí mismo
+    if (userId === currentUser?.id) return false;
+
+    // No puede eliminar si tiene transacciones
+    const userTx = transactionsByUser.get(userId);
+    return !userTx || userTx.total === 0;
+  };
+
+  const getUserTransactionInfo = (userId: string) => {
+    return transactionsByUser.get(userId) || { contributions: 0, expenses: 0, total: 0 };
   };
 
   return (
@@ -170,12 +227,10 @@ export default function UserApprovalManager() {
                   )}
                 >
                   <div className="flex items-start gap-3">
-                    {/* Avatar */}
                     <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 font-bold text-lg flex-shrink-0">
                       {user.name.charAt(0).toUpperCase()}
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{user.name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
@@ -187,7 +242,6 @@ export default function UserApprovalManager() {
                     </div>
                   </div>
 
-                  {/* Botones de acción */}
                   <div className="flex gap-2 mt-4">
                     <button
                       onClick={() => handleApprove(user.id)}
@@ -211,7 +265,6 @@ export default function UserApprovalManager() {
                     </button>
                   </div>
 
-                  {/* Confirmación de rechazo */}
                   {showDeleteConfirm === user.id && (
                     <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3">
                       <div className="flex items-start gap-2 mb-3">
@@ -267,47 +320,118 @@ export default function UserApprovalManager() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
               {approvedUsers.map((user) => {
                 const isCurrentUser = user.id === currentUser?.id;
+                const canDelete = canDeleteUser(user.id);
+                const txInfo = getUserTransactionInfo(user.id);
+
                 return (
                   <div
                     key={user.id}
                     className={cn(
-                      "p-4 flex items-center gap-3",
+                      "p-4",
                       isCurrentUser && "bg-blue-50/50"
                     )}
                   >
-                    {/* Avatar */}
-                    <div className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0",
-                      isCurrentUser
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-600"
-                    )}>
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "font-medium text-sm truncate",
-                        isCurrentUser ? "text-blue-900" : "text-gray-900"
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0",
+                        isCurrentUser
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 text-gray-600"
                       )}>
-                        {user.name} {isCurrentUser && '(Tú)'}
-                      </p>
-                      <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "font-medium text-sm truncate",
+                          isCurrentUser ? "text-blue-900" : "text-gray-900"
+                        )}>
+                          {user.name} {isCurrentUser && '(Tú)'}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
+
+                        {/* Info de transacciones */}
+                        {txInfo.total > 0 && (
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            {txInfo.total} transacciones • Aportes: {formatCurrency(txInfo.contributions)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-medium px-2 py-1 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Activo
+                        </div>
+
+                        {/* Botón eliminar (solo si puede) */}
+                        {!isCurrentUser && (
+                          <button
+                            onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
+                            disabled={!canDelete}
+                            className={cn(
+                              "p-2 rounded-lg transition-colors",
+                              canDelete
+                                ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                : "text-gray-300 cursor-not-allowed"
+                            )}
+                            title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Badge de aprobado */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-medium px-2 py-1 rounded-full">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Activo
+                    {/* Confirmación de eliminación */}
+                    {showRemoveUserConfirm === user.id && (
+                      <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                        <div className="flex items-start gap-2 mb-3">
+                          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-red-700 font-medium">
+                              ¿Eliminar a {user.name}?
+                            </p>
+                            <p className="text-[10px] text-red-600 mt-1">
+                              Este usuario no tiene transacciones registradas, por lo que puede ser eliminado sin afectar los cálculos.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowRemoveUserConfirm(null)}
+                            className="flex-1 bg-white border border-gray-200 text-gray-700 text-sm font-medium py-2 rounded-lg"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => handleRemoveUser(user.id)}
+                            disabled={processingId === user.id}
+                            className="flex-1 bg-red-600 text-white text-sm font-medium py-2 rounded-lg flex items-center justify-center gap-1"
+                          >
+                            {processingId === user.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
-                      {user.approvedBy && user.approvedBy !== user.id && (
-                        <p className="text-[10px] text-gray-400 mt-1">
-                          por {getApproverName(user.approvedBy)}
+                    )}
+
+                    {/* Info de por qué no se puede eliminar */}
+                    {!isCurrentUser && !canDelete && showRemoveUserConfirm !== user.id && (
+                      <div className="mt-2 ml-13">
+                        <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                          <XCircle className="w-3 h-3" />
+                          No eliminable: tiene {txInfo.total} transacciones
                         </p>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -323,11 +447,11 @@ export default function UserApprovalManager() {
               <p className="text-sm font-medium text-blue-800 mb-1">
                 Sobre el control de acceso
               </p>
-              <p className="text-xs text-blue-600">
-                Cuando alguien nuevo intenta entrar a la app, su cuenta quedará pendiente
-                hasta que un miembro activo la apruebe desde esta pantalla. Los usuarios
-                rechazados no podrán acceder.
-              </p>
+              <ul className="text-xs text-blue-600 space-y-1">
+                <li>• Nuevos usuarios quedan pendientes hasta ser aprobados</li>
+                <li>• Solo se pueden eliminar usuarios sin transacciones</li>
+                <li>• Los usuarios con aportes o gastos no pueden ser eliminados para mantener la integridad de los datos</li>
+              </ul>
             </div>
           </div>
         </div>
