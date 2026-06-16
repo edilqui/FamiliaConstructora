@@ -325,7 +325,7 @@ export default function ProjectExpenses() {
       {/* --- FAB (Agregar Gasto Rápido) --- */}
       <button
         onClick={() => setShowExpenseForm(true)}
-        className="fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+        className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
       >
         <Minus className="w-6 h-6" />
         <span className="font-medium text-sm pr-1">Gasto</span>

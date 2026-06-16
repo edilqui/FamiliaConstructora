@@ -16,6 +16,7 @@ import NotificationButton from '../components/NotificationButton';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
+  LineChart, Line, Legend,
 } from 'recharts';
 import {
   format, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval,
@@ -35,12 +36,22 @@ export default function Dashboard() {
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [timePeriod, setTimePeriod] = useState<'weekly' | 'monthly'>('monthly');
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [enabledContributorIds, setEnabledContributorIds] = useState<Set<string>>(new Set());
+  const [contributorFilterReady, setContributorFilterReady] = useState(false);
+  const [contributionMonths, setContributionMonths] = useState<6 | 12 | 24>(6);
 
   useEffect(() => {
     if (projects.length > 0 && selectedProjects.length === 0) {
       setSelectedProjects(projects.map(p => p.id));
     }
   }, [projects, selectedProjects.length]);
+
+  useEffect(() => {
+    if (!contributorFilterReady && memberStats.length > 0) {
+      setEnabledContributorIds(new Set(memberStats.map(s => s.userId)));
+      setContributorFilterReady(true);
+    }
+  }, [memberStats, contributorFilterReady]);
 
   const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
 
@@ -167,6 +178,53 @@ export default function Dashboard() {
     })),
     [collaboratorStats, currentUser],
   );
+
+  // ── Aportes mensuales por miembro (últimos 6 meses) ─────────────────────────
+  const contributionLineData = useMemo(() => {
+    const months = Array.from({ length: contributionMonths }, (_, i) => subMonths(now, contributionMonths - 1 - i));
+    const tickFormat = contributionMonths === 6 ? 'MMM' : "MMM yy";
+
+    const allContributors = [
+      ...memberStats.map(s => ({ userId: s.userId, name: s.userName, type: 'member' as const })),
+      ...collaboratorStats.map(s => ({ userId: s.userId, name: s.userName, type: 'collaborator' as const })),
+    ];
+
+    const activeContributors = allContributors.filter(c =>
+      transactions.some(t => t.type === 'contribution' && t.userId === c.userId)
+    );
+
+    const data = months.map(monthDate => {
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const entry: Record<string, string | number> = {
+        month: format(monthDate, tickFormat, { locale: es }),
+      };
+      activeContributors.forEach(c => {
+        entry[c.name] = transactions
+          .filter(t =>
+            t.type === 'contribution' &&
+            t.userId === c.userId &&
+            t.date >= monthStart &&
+            t.date <= monthEnd
+          )
+          .reduce((s, t) => s + t.amount, 0);
+      });
+      return entry;
+    });
+
+    const xAxisInterval = contributionMonths === 24 ? 3 : contributionMonths === 12 ? 1 : 0;
+
+    return { data, contributors: activeContributors, xAxisInterval };
+  }, [transactions, memberStats, collaboratorStats, contributionMonths]);
+
+  const toggleContributor = (userId: string) => {
+    setEnabledContributorIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
 
   const toggleProject = (id: string) =>
     setSelectedProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
@@ -554,6 +612,121 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+
+            {/* ── Aportes mensuales por miembro ── */}
+            {contributionLineData.contributors.length > 0 && (
+              <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg flex-shrink-0">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-gray-800 text-sm">Aportes por Miembro</h3>
+                      <p className="text-[10px] text-gray-400 font-medium">Comparativa mensual</p>
+                    </div>
+                  </div>
+                  {/* Selector de rango */}
+                  <div className="flex p-0.5 bg-gray-100 rounded-lg flex-shrink-0">
+                    {([6, 12, 24] as const).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setContributionMonths(m)}
+                        className={cn(
+                          'px-2.5 py-1 text-xs font-semibold rounded-md transition-all',
+                          contributionMonths === m
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-400 hover:text-gray-600',
+                        )}
+                      >
+                        {m}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pills de filtro */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {contributionLineData.contributors.map((c, i) => {
+                    const color = COLORS[i % COLORS.length];
+                    const isEnabled = enabledContributorIds.has(c.userId);
+                    const isCollaborator = c.type === 'collaborator';
+                    return (
+                      <button
+                        key={c.userId}
+                        onClick={() => toggleContributor(c.userId)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all',
+                          isEnabled
+                            ? 'text-white'
+                            : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300',
+                        )}
+                        style={isEnabled ? { backgroundColor: color, borderColor: color } : {}}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: isEnabled ? 'rgba(255,255,255,0.7)' : color }}
+                        />
+                        {c.name}
+                        {isCollaborator && (
+                          <span className={cn(
+                            'text-[9px] px-1 py-0.5 rounded font-bold ml-0.5',
+                            isEnabled ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-500',
+                          )}>
+                            collab
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Gráfico */}
+                <div className="h-52 lg:h-60 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={contributionLineData.data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 10, fill: '#9ca3af' }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={8}
+                        interval={contributionLineData.xAxisInterval}
+                      />
+                      <YAxis
+                        tickFormatter={formatShort}
+                        tick={{ fontSize: 9, fill: '#9ca3af' }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={42}
+                      />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                        formatter={(value: number | undefined) => [formatCurrency(value ?? 0), '']}
+                        labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
+                      />
+                      {contributionLineData.contributors.map((c, i) => {
+                        const color = COLORS[i % COLORS.length];
+                        return (
+                          <Line
+                            key={c.userId}
+                            type="monotone"
+                            dataKey={c.name}
+                            stroke={color}
+                            strokeWidth={2.5}
+                            dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                            activeDot={{ r: 5, strokeWidth: 0 }}
+                            hide={!enabledContributorIds.has(c.userId)}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center opacity-60">
@@ -684,9 +857,9 @@ export default function Dashboard() {
 
       {/* MODAL FILTROS */}
       {showFilterModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowFilterModal(false)} />
-          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 animate-in slide-in-from-bottom-10 duration-300">
+          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">Configurar Gráfico</h2>
