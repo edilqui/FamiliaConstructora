@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, deleteField } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { TransactionType } from '../types';
 import { createNotification } from './notificationService';
@@ -173,6 +173,25 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
     console.error('Error al actualizar transacción:', error);
     throw error;
   }
+};
+
+export const bulkUpdateTransactions = async (
+  ids: string[],
+  updates: Record<string, any>
+): Promise<void> => {
+  if (ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach(id => batch.update(doc(db, 'transactions', id), updates));
+  await batch.commit();
+};
+
+export const bulkClearActivityFromTransactions = async (ids: string[]): Promise<void> => {
+  return bulkUpdateTransactions(ids, {
+    stageId: deleteField(),
+    stageName: deleteField(),
+    activityId: deleteField(),
+    activityName: deleteField(),
+  });
 };
 
 interface DeleteTransactionParams {
