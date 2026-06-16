@@ -15,7 +15,8 @@ import {
   Bell,
   ListTodo,
   UserCheck,
-  HardDrive
+  HardDrive,
+  Building2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -48,6 +49,13 @@ export default function Settings() {
 
   // Definimos las opciones agrupadas para mejor organización visual
   const managementOptions: SettingOption[] = [
+    {
+      id: 'obra',
+      label: 'Avance de Obra',
+      icon: Building2,
+      path: '/obra',
+      color: 'bg-orange-500',
+    },
     {
       id: 'categories',
       label: 'Categorías de Gastos',

@@ -14,6 +14,7 @@ import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
 import BackupManager from './features/BackupManager';
+import ConstructionManager from './features/ConstructionManager';
 import PendingApproval from './features/PendingApproval';
 import Login from './features/Login';
 import { Loader2 } from 'lucide-react';
@@ -194,6 +195,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <BackupManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/obra"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ConstructionManager />
               </Layout>
             </ProtectedRoute>
           }

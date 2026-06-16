@@ -18,10 +18,14 @@ interface AddTransactionParams {
   quantity?: number; // Cantidad de productos (opcional)
   unitPrice?: number; // Precio unitario (opcional)
   date?: Date; // Fecha opcional, si no se proporciona usa la fecha actual
+  activityId?: string | null;
+  activityName?: string | null;
+  stageId?: string | null;
+  stageName?: string | null;
 }
 
 export const addTransaction = async (params: AddTransactionParams): Promise<void> => {
-  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, registeredByName, description, notes, quantity, unitPrice, date } = params;
+  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, registeredByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
 
   try {
     const transactionsRef = collection(db, 'transactions');
@@ -45,12 +49,17 @@ export const addTransaction = async (params: AddTransactionParams): Promise<void
       data.notes = notes;
     }
 
-    // Solo incluir quantity y unitPrice si tienen valor
     if (quantity !== undefined && quantity !== null) {
       data.quantity = quantity;
     }
     if (unitPrice !== undefined && unitPrice !== null) {
       data.unitPrice = unitPrice;
+    }
+    if (activityId) {
+      data.activityId = activityId;
+      data.activityName = activityName ?? null;
+      data.stageId = stageId ?? null;
+      data.stageName = stageName ?? null;
     }
 
     const docRef = await addDoc(transactionsRef, data);
@@ -95,10 +104,14 @@ interface UpdateTransactionParams {
   quantity?: number | null; // Cantidad de productos (opcional, null para eliminar)
   unitPrice?: number | null; // Precio unitario (opcional, null para eliminar)
   date: Date;
+  activityId?: string | null;
+  activityName?: string | null;
+  stageId?: string | null;
+  stageName?: string | null;
 }
 
 export const updateTransaction = async (params: UpdateTransactionParams): Promise<void> => {
-  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date } = params;
+  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
 
   try {
     const transactionRef = doc(db, 'transactions', id);
@@ -130,6 +143,12 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
     if (unitPrice !== undefined) {
       data.unitPrice = unitPrice !== null ? unitPrice : deleteField();
     }
+
+    // Guardar o limpiar campos de actividad de obra
+    data.activityId   = activityId   || deleteField();
+    data.activityName = activityName || deleteField();
+    data.stageId      = stageId      || deleteField();
+    data.stageName    = stageName    || deleteField();
 
     await updateDoc(transactionRef, data);
 

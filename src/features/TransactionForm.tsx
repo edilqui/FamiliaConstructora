@@ -1,6 +1,7 @@
 import { useState, FormEvent, useEffect, useMemo } from 'react';
-import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown, Calculator, Package } from 'lucide-react';
+import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, ChevronDown, Calculator, Package, HardHat, ChevronRight } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useConstructionData } from '../hooks/useConstructionData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
 import { formatCurrency, cn } from '../lib/utils';
@@ -8,6 +9,7 @@ import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
 import CategorySelector from '../components/CategorySelector';
+import ActivitySelector from '../components/ActivitySelector';
 
 interface TransactionFormProps {
   onClose: () => void;
@@ -17,6 +19,7 @@ interface TransactionFormProps {
 
 export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
   const { projects, categories, totalInBox, users } = useDashboardData();
+  const { stages, activities } = useConstructionData();
   const user = useAuthStore((state) => state.user);
   const isEditMode = !!transactionToEdit;
 
@@ -36,6 +39,13 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+
+  // Actividad de obra (opcional)
+  const [showActivitySelector, setShowActivitySelector] = useState(false);
+  const [selectedStageId, setSelectedStageId] = useState('');
+  const [selectedStageName, setSelectedStageName] = useState('');
+  const [selectedActivityId, setSelectedActivityId] = useState('');
+  const [selectedActivityName, setSelectedActivityName] = useState('');
 
   // Modo detallado (cantidad × valor unitario)
   const [detailedMode, setDetailedMode] = useState(false);
@@ -61,13 +71,20 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       setDescription(transactionToEdit.description);
       setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
-      setTime(format(transactionToEdit.date, 'HH:mm')); // Extraer hora existente
+      setTime(format(transactionToEdit.date, 'HH:mm'));
 
-      // Cargar quantity y unitPrice si existen
       if (transactionToEdit.quantity !== undefined && transactionToEdit.unitPrice !== undefined) {
         setDetailedMode(true);
         setQuantity(transactionToEdit.quantity.toString());
         setUnitPrice(transactionToEdit.unitPrice.toString());
+      }
+
+      if (transactionToEdit.activityId) {
+        setShowActivitySelector(true);
+        setSelectedStageId(transactionToEdit.stageId || '');
+        setSelectedStageName(transactionToEdit.stageName || '');
+        setSelectedActivityId(transactionToEdit.activityId);
+        setSelectedActivityName(transactionToEdit.activityName || '');
       }
     }
   }, [transactionToEdit]);
@@ -136,6 +153,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           date: transactionDate,
           updatedBy: user.id,
           updatedByName: user.name,
+          activityId: selectedActivityId || null,
+          activityName: selectedActivityName || null,
+          stageId: selectedStageId || null,
+          stageName: selectedStageName || null,
         });
       } else {
         if (paymentSource !== 'caja') {
@@ -171,6 +192,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
             unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
             date: transactionDate,
+            activityId: selectedActivityId || null,
+            activityName: selectedActivityName || null,
+            stageId: selectedStageId || null,
+            stageName: selectedStageName || null,
           });
         } else {
           await addTransaction({
@@ -188,6 +213,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
             unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
             date: transactionDate,
+            activityId: selectedActivityId || null,
+            activityName: selectedActivityName || null,
+            stageId: selectedStageId || null,
+            stageName: selectedStageName || null,
           });
         }
       }
@@ -367,6 +396,46 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                 required
               />
             </div>
+          </div>
+
+          {/* ACTIVIDAD DE OBRA (Opcional) */}
+          <div className="rounded-2xl border border-orange-100 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setShowActivitySelector(!showActivitySelector);
+                if (showActivitySelector) {
+                  setSelectedStageId('');
+                  setSelectedStageName('');
+                  setSelectedActivityId('');
+                  setSelectedActivityName('');
+                }
+              }}
+              className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <HardHat className="w-4 h-4 text-orange-500" />
+                <span className="text-sm font-semibold text-orange-700">
+                  {showActivitySelector && selectedActivityName
+                    ? `${selectedStageName} › ${selectedActivityName}`
+                    : 'Asociar a actividad de obra'}
+                </span>
+              </div>
+              <ChevronRight className={cn('w-4 h-4 text-orange-400 transition-transform', showActivitySelector && 'rotate-90')} />
+            </button>
+            {showActivitySelector && (
+              <div className="p-4 bg-orange-50/40 border-t border-orange-100">
+                <ActivitySelector
+                  stages={stages}
+                  activities={activities}
+                  selectedStageId={selectedStageId}
+                  selectedActivityId={selectedActivityId}
+                  onStageChange={(id, name) => { setSelectedStageId(id); setSelectedStageName(name); }}
+                  onActivityChange={(id, name) => { setSelectedActivityId(id); setSelectedActivityName(name); }}
+                  projectId={projectId}
+                />
+              </div>
+            )}
           </div>
 
           {/* FUENTE DE PAGO (Solo Crear) */}

@@ -43,6 +43,10 @@ export interface Transaction {
   notes?: string; // Notas adicionales (opcional)
   quantity?: number; // Cantidad de productos (opcional, para gastos detallados)
   unitPrice?: number; // Precio unitario (opcional, para gastos detallados)
+  activityId?: string | null; // ID de actividad de obra (opcional)
+  activityName?: string | null; // Nombre de la actividad (para mostrar)
+  stageId?: string | null; // ID de etapa de obra (opcional)
+  stageName?: string | null; // Nombre de la etapa (para mostrar)
   createdAt: Date;
 }
 
@@ -93,6 +97,34 @@ export interface Notification {
   amount?: number; // Monto de la transacción
   projectName?: string; // Nombre del proyecto
   readBy: string[]; // Array de userIds que ya la leyeron/eliminaron
+}
+
+// --- AVANCE DE OBRA ---
+export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'paused';
+export type ActivityStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface Stage {
+  id: string;
+  name: string;
+  projectId: string;
+  estimatedBudget: number;
+  status: StageStatus;
+  order: number;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+export interface Activity {
+  id: string;
+  name: string;
+  stageId: string;
+  projectId: string;
+  estimatedBudget: number;
+  status: ActivityStatus;
+  progressPercent: number; // 0-100, avance físico
+  order: number;
+  createdAt: Date;
+  completedAt?: Date;
 }
 
 // --- TAREAS / NOTAS ---
