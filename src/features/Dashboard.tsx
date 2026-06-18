@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
 import { formatCurrency, cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import {
   Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown,
   BarChart3, Filter, X, Check, Users,
   Calendar, ArrowUpRight, ArrowDownRight, Building2, ChevronRight,
-  Tag,
+  Tag, WifiOff,
 } from 'lucide-react';
 import TransactionForm from './TransactionForm';
 import ContributionForm from './ContributionForm';
@@ -29,6 +30,16 @@ export default function Dashboard() {
   const { projects, categories, transactions, totalInBox, userStats, memberStats, collaboratorStats, memberCount, projectStats, loading } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const currentUser = useAuthStore((state) => state.user);
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const up = () => setIsOnline(true);
+    const down = () => setIsOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
 
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
@@ -232,6 +243,8 @@ export default function Dashboard() {
     setSelectedProjects(selectedProjects.length === projects.length ? [] : projects.map(p => p.id));
   const hasActiveFilters = selectedProjects.length < projects.length;
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
   }
@@ -242,10 +255,26 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 lg:px-8 py-3 lg:py-4 border-b border-gray-100 flex justify-between items-center shadow-sm">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md px-4 lg:px-8 py-3 lg:py-4 border-b border-gray-100 flex justify-between items-center shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard</h1>
-        <NotificationButton />
+        <div className="flex items-center gap-2">
+          {!isOnline && (
+            <span className="flex items-center gap-1.5 text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-semibold">
+              <WifiOff className="w-3 h-3" />
+              Sin conexión
+            </span>
+          )}
+          <NotificationButton />
+        </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-6 space-y-6 max-w-7xl mx-auto">
 

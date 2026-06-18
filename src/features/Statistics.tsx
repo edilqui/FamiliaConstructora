@@ -6,6 +6,7 @@ import {
   Users, Briefcase, Activity, BarChart3, Tag
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import CategoryReport from './CategoryReport';
 import NotificationButton from '../components/NotificationButton';
 
@@ -14,6 +15,7 @@ type TabType = 'statistics' | 'categories';
 export default function Statistics() {
   const { userStats, memberStats, collaboratorStats, projectStats, transactions, totalInBox, loading } = useDashboardData();
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   if (loading) {
     return (
@@ -41,7 +43,14 @@ export default function Statistics() {
     <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <div className="px-4 lg:px-8 py-3 lg:py-4 flex items-start justify-between">
           <div>
             <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Reportes</h1>
@@ -85,6 +94,7 @@ export default function Statistics() {
           </button>
         </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
 

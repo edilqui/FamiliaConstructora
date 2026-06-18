@@ -18,6 +18,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import {
   createCategory,
   updateCategory,
@@ -212,11 +213,20 @@ export default function CategoriesManager() {
     }
   };
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY CON BUSCADOR --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={() => navigate('/settings')}
@@ -239,6 +249,7 @@ export default function CategoriesManager() {
           />
         </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       {/* --- ALERTA FLOTANTE (Toast) --- */}
       {message && (

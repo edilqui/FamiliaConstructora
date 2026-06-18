@@ -7,6 +7,7 @@ import {
   Wallet, History, Search, Filter
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -92,6 +93,8 @@ export default function Balance() {
     return Math.max(amountToCatchUp, totalInBox * 0.25);
   }, [amountToCatchUp, totalInBox]);
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   if (!currentUserStats || !user) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -107,9 +110,9 @@ export default function Balance() {
   const isCurrent = Math.abs(currentUserStats.balance) < 1;
 
   // Definir colores semánticos basados en el estado
-  const statusColors = isInDebt 
+  const statusColors = isInDebt
     ? { bg: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600', border: 'border-red-100' }
-    : isCurrent 
+    : isCurrent
       ? { bg: 'bg-blue-600', light: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' }
       : { bg: 'bg-emerald-600', light: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' };
 
@@ -117,7 +120,14 @@ export default function Balance() {
     <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY TIPO APP --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-gray-900 rounded-lg">
@@ -146,6 +156,7 @@ export default function Balance() {
           />
         </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
 

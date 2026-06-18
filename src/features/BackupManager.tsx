@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import {
   exportAllData,
   generateBackupFileName,
@@ -159,11 +160,20 @@ export default function BackupManager() {
     setImportResult(null);
   };
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm flex items-center gap-3">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm flex items-center gap-3",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <button
           onClick={() => navigate('/settings')}
           className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
@@ -178,6 +188,7 @@ export default function BackupManager() {
           <HardDrive className="w-5 h-5 text-blue-600" />
         </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-6 max-w-2xl mx-auto space-y-6">
 

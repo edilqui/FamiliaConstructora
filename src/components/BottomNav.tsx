@@ -9,40 +9,20 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  {
-    path: '/',
-    label: 'Inicio',
-    icon: Home,
-  },
-  {
-    path: '/expenses',
-    label: 'Movimientos',
-    icon: Wallet,
-  },
-  {
-    path: '/balance',
-    label: 'Balance',
-    icon: Scale,
-  },
-  {
-    path: '/statistics',
-    label: 'Reportes',
-    icon: BarChart3,
-  },
-  {
-    path: '/settings',
-    label: 'Ajustes',
-    icon: Settings,
-  },
+  { path: '/',           label: 'Inicio',      icon: Home     },
+  { path: '/expenses',   label: 'Movimientos', icon: Wallet   },
+  { path: '/balance',    label: 'Balance',     icon: Scale    },
+  { path: '/statistics', label: 'Reportes',    icon: BarChart3 },
+  { path: '/settings',   label: 'Ajustes',     icon: Settings },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 safe-area-inset-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] z-50 safe-area-inset-bottom">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-around items-center h-16 sm:h-20">
+        <div className="flex justify-around items-end h-16 sm:h-[4.5rem] px-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -51,31 +31,28 @@ export default function BottomNav() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 relative',
-                  isActive
-                    ? 'text-primary-600'
-                    : 'text-gray-500 hover:text-gray-700 active:bg-gray-50'
-                )}
+                className="flex flex-col items-center justify-end flex-1 pb-2 h-full pt-1 transition-colors"
               >
-                {/* Indicador superior para página activa */}
-                {isActive && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 sm:w-16 h-1 bg-primary-600 rounded-b-full transition-all" />
-                )}
-
-                {/* Icono */}
-                <Icon className={cn(
-                  'w-6 h-6 sm:w-7 sm:h-7 mb-1 transition-transform',
-                  isActive && 'scale-110'
-                )} />
+                {/* Pill del ícono activo */}
+                <div className={cn(
+                  'flex items-center justify-center rounded-2xl transition-all duration-200',
+                  isActive
+                    ? 'bg-emerald-100 w-14 h-7 mb-0.5'
+                    : 'w-7 h-7 mb-0.5',
+                )}>
+                  <Icon className={cn(
+                    'transition-all duration-200',
+                    isActive
+                      ? 'w-5 h-5 text-emerald-700'
+                      : 'w-6 h-6 text-gray-400',
+                  )} />
+                </div>
 
                 {/* Label */}
-                <span
-                  className={cn(
-                    'text-xs sm:text-sm font-medium transition-all',
-                    isActive && 'font-semibold'
-                  )}
-                >
+                <span className={cn(
+                  'text-[10px] sm:text-xs font-medium leading-tight transition-colors duration-200',
+                  isActive ? 'text-emerald-700 font-semibold' : 'text-gray-400',
+                )}>
                   {item.label}
                 </span>
               </Link>

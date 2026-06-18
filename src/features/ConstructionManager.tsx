@@ -1,4 +1,5 @@
 import { useState, useMemo, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
@@ -13,6 +14,7 @@ import {
   createActivity, updateActivity, deleteActivity, getNextActivityOrder,
 } from '../services/activityService';
 import { formatCurrency, cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import type { Stage, Activity, StageStatus, ActivityStatus } from '../types';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ const defaultActivityForm = (): ActivityFormData => ({ name: '', estimatedBudget
 // ── main component ──────────────────────────────────────────────────────────
 
 export default function ConstructionManager() {
+  const navigate = useNavigate();
   const { stages, activities, loading } = useConstructionData();
   const { projects, transactions } = useDashboardData();
 
@@ -394,10 +397,14 @@ export default function ConstructionManager() {
     return (
       <div key={activity.id} className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <HardHat className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          {/* Área clickeable → navega al detalle */}
+          <button
+            onClick={() => navigate(`/activity/${activity.id}`)}
+            className="flex items-center gap-2 flex-1 min-w-0 text-left hover:opacity-75 transition-opacity active:opacity-60"
+          >
+            <HardHat className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
             <span className="text-sm font-medium text-gray-800 truncate">{activity.name}</span>
-          </div>
+          </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StatusBadge status={activity.status} type="activity" />
             <button onClick={() => openEditActivity(activity)} className="p-1 text-gray-400 hover:text-blue-600 rounded-lg transition-colors">
@@ -565,11 +572,20 @@ export default function ConstructionManager() {
 
   // ── main render ───────────────────────────────────────────────────────────
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 shadow-sm">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center">
@@ -588,6 +604,7 @@ export default function ConstructionManager() {
           )}
         </div>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 max-w-7xl mx-auto space-y-4">
 

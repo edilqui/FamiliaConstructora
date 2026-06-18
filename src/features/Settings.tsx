@@ -19,6 +19,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 
 interface SettingOption {
   id: string;
@@ -174,31 +175,45 @@ export default function Settings() {
     );
   };
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm flex items-center gap-3">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm flex items-center gap-3",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Configuración</h1>
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-6 max-w-7xl mx-auto space-y-6">
 
         {/* --- PERFIL HEADER --- */}
         {user && (
-          <div 
-            onClick={() => navigate('/settings/profile')}
-            className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 active:scale-[0.98] transition-transform cursor-pointer"
-          >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-md ring-4 ring-white">
-              {user.name.charAt(0).toUpperCase()}
+          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 shadow-lg">
+            <div className="flex items-center gap-4">
+              {/* Avatar */}
+              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl font-bold shadow-inner flex-shrink-0">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-white leading-tight truncate">{user.name}</h2>
+                <p className="text-sm text-emerald-100 truncate">{user.email}</p>
+                <div className="mt-1.5">
+                  <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {(user as any).role === 'collaborator' ? 'Colaborador' : 'Miembro'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-gray-900 leading-tight">{user.name}</h2>
-              <p className="text-sm text-gray-500">{user.email}</p>
-              <p className="text-xs text-blue-600 font-medium mt-1">Editar perfil</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-300" />
           </div>
         )}
 

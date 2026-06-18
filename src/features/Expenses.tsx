@@ -7,6 +7,7 @@ import {
   Trash2, Wallet, ArrowLeft, MoreVertical, Check, Tag, HardHat,
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -196,11 +197,21 @@ export default function Expenses() {
   }, [filteredTransactions]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  const { hidden, spacerHeight, headerRef } = useScrollAwareHeader();
+  const headerHidden = !isSelectionMode && hidden;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
 
         {isSelectionMode ? (
           /* ── Barra de selección ── */
@@ -290,6 +301,7 @@ export default function Expenses() {
           </>
         )}
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto">
 

@@ -6,6 +6,7 @@ import {
   FolderKanban, Receipt, ArrowDownCircle
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
+import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import TransactionForm from './TransactionForm';
@@ -104,6 +105,8 @@ export default function ProjectExpenses() {
     return grouped;
   }, [categories]);
 
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
+
   // --- UI ERROR SI NO EXISTE PROYECTO ---
   if (!currentProject) {
     return (
@@ -119,7 +122,14 @@ export default function ProjectExpenses() {
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm transition-all">
+      <header
+        ref={headerRef}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm",
+          "transition-transform duration-300 ease-in-out",
+          headerHidden ? '-translate-y-full' : 'translate-y-0',
+        )}
+      >
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => navigate('/')}
@@ -201,6 +211,7 @@ export default function ProjectExpenses() {
           </div>
         )}
       </header>
+      <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto space-y-5">
         
