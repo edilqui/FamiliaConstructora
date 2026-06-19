@@ -4,7 +4,7 @@ import { useConstructionData } from '../hooks/useConstructionData';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   Search, Filter, Plus, Minus, ArrowUpCircle, ArrowDownCircle,
-  Trash2, Wallet, ArrowLeft, MoreVertical, Check, Tag, HardHat,
+  Trash2, Wallet, ArrowLeft, MoreVertical, Check, Tag, HardHat, X,
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -42,6 +42,7 @@ export default function Expenses() {
   const [filterProject, setFilterProject] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   // ── Selección múltiple ──────────────────────────────────────────────────────
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -245,9 +246,42 @@ export default function Expenses() {
         ) : (
           /* ── Header normal ── */
           <>
-            <div className="flex items-center justify-between mb-3">
-              <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Historial</h1>
-              <div className="flex items-center gap-2">
+            {showSearch ? (
+              /* ── Modo búsqueda ── */
+              <div className="flex items-center gap-2 min-h-[40px]">
+                <button
+                  onClick={() => { setShowSearch(false); setSearchTerm(''); setShowFilters(false); }}
+                  className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-700" />
+                </button>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar gasto o aporte..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="flex-1 bg-gray-100 text-sm py-2 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-gray-400"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* ── Modo normal ── */
+              <div className="flex items-center gap-1 min-h-[40px]">
+                <h1 className="text-lg lg:text-2xl font-bold text-gray-900 flex-1">Historial</h1>
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
                 <NotificationButton />
                 <button
                   onClick={() => setShowFilters(!showFilters)}
@@ -257,18 +291,8 @@ export default function Expenses() {
                   {hasActiveFilters && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />}
                 </button>
               </div>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar gasto o aporte..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full bg-gray-100 text-sm py-2.5 pl-9 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-gray-400"
-              />
-            </div>
-            {showFilters && (
+            )}
+            {showFilters && !showSearch && (
               <div className="mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2 fade-in duration-200">
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
@@ -342,7 +366,10 @@ export default function Expenses() {
                 const headerDate = new Date(year, month - 1, day);
                 return (
                   <div key={dateKey}>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sticky top-28 ml-1">
+                    <h3
+                      style={{ top: headerHidden ? 0 : spacerHeight }}
+                      className="text-xs font-bold text-gray-500 uppercase tracking-wider sticky z-20 bg-gray-50/95 backdrop-blur-sm py-1.5 mb-2 transition-[top] duration-300 ease-in-out"
+                    >
                       {format(headerDate, "EEEE, d 'de' MMMM", { locale: es })}
                     </h3>
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

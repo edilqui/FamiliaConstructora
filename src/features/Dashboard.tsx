@@ -44,9 +44,12 @@ export default function Dashboard() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [timePeriod, setTimePeriod] = useState<'weekly' | 'monthly'>('monthly');
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [selectedCategoryProjects, setSelectedCategoryProjects] = useState<string[]>([]);
+  const [categoryTimeRange, setCategoryTimeRange] = useState<'1m' | '3m' | '6m' | '12m' | 'all'>('6m');
   const [enabledContributorIds, setEnabledContributorIds] = useState<Set<string>>(new Set());
   const [contributorFilterReady, setContributorFilterReady] = useState(false);
   const [contributionMonths, setContributionMonths] = useState<6 | 12 | 24>(6);
@@ -56,6 +59,12 @@ export default function Dashboard() {
       setSelectedProjects(projects.map(p => p.id));
     }
   }, [projects, selectedProjects.length]);
+
+  useEffect(() => {
+    if (projects.length > 0 && selectedCategoryProjects.length === 0) {
+      setSelectedCategoryProjects(projects.map(p => p.id));
+    }
+  }, [projects, selectedCategoryProjects.length]);
 
   useEffect(() => {
     if (!contributorFilterReady && memberStats.length > 0) {
@@ -160,6 +169,29 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value);
   }, [filteredExpenses, categories]);
 
+  const categoryFilteredExpenses = useMemo(() => {
+    let fromDate: Date | null = null;
+    if (categoryTimeRange !== 'all') {
+      const months = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 }[categoryTimeRange];
+      fromDate = subMonths(now, months);
+    }
+    return transactions.filter(t =>
+      t.type === 'expense' &&
+      t.projectId && selectedCategoryProjects.includes(t.projectId) &&
+      (fromDate === null || t.date >= fromDate)
+    );
+  }, [transactions, selectedCategoryProjects, categoryTimeRange]);
+
+  const categoryData = useMemo(() => {
+    const totals = new Map<string, number>();
+    categoryFilteredExpenses.forEach(t => {
+      if (t.categoryId) totals.set(t.categoryId, (totals.get(t.categoryId) || 0) + t.amount);
+    });
+    return Array.from(totals.entries())
+      .map(([id, val]) => ({ name: categories.find(c => c.id === id)?.name || 'Sin categoría', value: val }))
+      .sort((a, b) => b.value - a.value);
+  }, [categoryFilteredExpenses, categories]);
+
   const memberContributionProgress = useMemo(() => {
     const effectiveBudgetTotal = projects.reduce((sum, project) => {
       if (project.budget > 0) return sum + project.budget;
@@ -242,6 +274,12 @@ export default function Dashboard() {
   const toggleAllProjects = () =>
     setSelectedProjects(selectedProjects.length === projects.length ? [] : projects.map(p => p.id));
   const hasActiveFilters = selectedProjects.length < projects.length;
+
+  const toggleCategoryProject = (id: string) =>
+    setSelectedCategoryProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+  const toggleAllCategoryProjects = () =>
+    setSelectedCategoryProjects(selectedCategoryProjects.length === projects.length ? [] : projects.map(p => p.id));
+  const hasCategoryActiveFilters = selectedCategoryProjects.length < projects.length || categoryTimeRange !== '6m';
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
@@ -494,25 +532,25 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-800 text-sm">Categorías</h3>
-                    <p className="text-[10px] text-gray-400">{allCategoryData.length} con gastos</p>
+                    <p className="text-[10px] text-gray-400">{categoryData.length} con gastos</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowFilterModal(true)}
+                  onClick={() => setShowCategoryFilter(true)}
                   className="p-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
                 >
                   <Filter className="w-4 h-4" />
-                  {hasActiveFilters && (
+                  {hasCategoryActiveFilters && (
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-purple-600 rounded-full ring-2 ring-white" />
                   )}
                 </button>
               </div>
 
               {(() => {
-                const total = filteredExpenses.reduce((a, b) => a + b.amount, 0);
+                const total = categoryFilteredExpenses.reduce((a, b) => a + b.amount, 0);
                 return (
                   <div className="overflow-y-auto max-h-56 lg:max-h-64 space-y-3 pr-1">
-                    {allCategoryData.map((entry, index) => {
+                    {categoryData.map((entry, index) => {
                       const pct = total > 0 ? (entry.value / total) * 100 : 0;
                       const color = COLORS[index % COLORS.length];
                       return (
@@ -883,6 +921,66 @@ export default function Dashboard() {
           <Plus className="w-7 h-7" />
         </button>
       </div>
+
+      {/* MODAL FILTRO CATEGORÍAS */}
+      {showCategoryFilter && (
+        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowCategoryFilter(false)} />
+          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Filtrar Categorías</h2>
+              <button onClick={() => setShowCategoryFilter(false)} className="p-1 rounded-full hover:bg-gray-100">
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Rango de Tiempo</label>
+                <div className="grid grid-cols-5 gap-1 p-1 bg-gray-100 rounded-xl">
+                  {(['1m', '3m', '6m', '12m', 'all'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setCategoryTimeRange(r)}
+                      className={cn(
+                        'py-2 text-xs font-semibold rounded-lg transition-all',
+                        categoryTimeRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      )}
+                    >
+                      {r === 'all' ? 'Todo' : r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos</label>
+                  <button onClick={toggleAllCategoryProjects} className="text-xs font-medium text-purple-600">
+                    {selectedCategoryProjects.length === projects.length ? 'Ocultar todos' : 'Ver todos'}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {projects.map(p => (
+                    <label
+                      key={p.id}
+                      onClick={() => toggleCategoryProject(p.id)}
+                      className={cn('flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all', selectedCategoryProjects.includes(p.id) ? 'border-purple-500 bg-purple-50/50' : 'border-gray-100 bg-white')}
+                    >
+                      <span className={cn('text-sm font-medium', selectedCategoryProjects.includes(p.id) ? 'text-purple-900' : 'text-gray-600')}>{p.name}</span>
+                      <div className={cn('w-5 h-5 rounded-full flex items-center justify-center border transition-colors', selectedCategoryProjects.includes(p.id) ? 'bg-purple-500 border-purple-500' : 'border-gray-300 bg-white')}>
+                        {selectedCategoryProjects.includes(p.id) && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setShowCategoryFilter(false)} className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl mt-6 active:scale-95 transition-transform">
+              Aplicar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL FILTROS */}
       {showFilterModal && (

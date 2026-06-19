@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import {
   Scale, TrendingUp, TrendingDown, User,
   DollarSign, AlertCircle, CheckCircle2,
-  Wallet, History, Search, Filter
+  Wallet, History
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -20,8 +20,6 @@ export default function Balance() {
   // Verificar si el usuario actual es colaborador
   const isCollaborator = user?.role === 'collaborator';
 
-  // Estado simple para simular la UI de búsqueda (listo para conectar tu lógica)
-  const [searchTerm, setSearchTerm] = useState('');
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
 
@@ -128,32 +126,14 @@ export default function Balance() {
           headerHidden ? '-translate-y-full' : 'translate-y-0',
         )}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-gray-900 rounded-lg">
               <Scale className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Finanzas</h1>
           </div>
-          <div className="flex gap-2">
-             <NotificationButton />
-             {/* Botones placeholder para filtros */}
-            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-              <Filter className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        
-        {/* Barra de búsqueda integrada en header */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Buscar transacción..." 
-            className="w-full bg-gray-100 text-sm py-2 pl-9 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <NotificationButton />
         </div>
       </header>
       <div style={{ height: spacerHeight }} />

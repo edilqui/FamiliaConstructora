@@ -1,28 +1,30 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 
 /**
  * Hides the header when scrolling down and shows it when scrolling up.
- * Returns a ref to put on the <header> element, the hidden state,
- * and the measured spacer height (so fixed-position headers don't overlap content).
+ * Uses a callback ref so measurement works even when the header renders
+ * after an initial loading/empty state.
  */
 export function useScrollAwareHeader(threshold = 60) {
   const [hidden, setHidden] = useState(false);
   const [spacerHeight, setSpacerHeight] = useState(0);
-  const headerRef = useRef<HTMLElement>(null);
+  const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
 
-  useLayoutEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-    setSpacerHeight(header.offsetHeight);
-
-    const ro = new ResizeObserver(() => {
-      setSpacerHeight(header.offsetHeight);
-    });
-    ro.observe(header);
-    return () => ro.disconnect();
+  const headerRef = useCallback((el: HTMLElement | null) => {
+    setHeaderEl(el);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!headerEl) return;
+    setSpacerHeight(headerEl.offsetHeight);
+    const ro = new ResizeObserver(() => {
+      setSpacerHeight(headerEl.offsetHeight);
+    });
+    ro.observe(headerEl);
+    return () => ro.disconnect();
+  }, [headerEl]);
 
   useEffect(() => {
     const handleScroll = () => {
