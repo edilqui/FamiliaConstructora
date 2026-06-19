@@ -366,12 +366,26 @@ export default function Expenses() {
                 const headerDate = new Date(year, month - 1, day);
                 return (
                   <div key={dateKey}>
-                    <h3
+                    <div
                       style={{ top: headerHidden ? 0 : spacerHeight }}
-                      className="text-xs font-bold text-gray-500 uppercase tracking-wider sticky z-20 bg-gray-50/95 backdrop-blur-sm py-1.5 mb-2 transition-[top] duration-300 ease-in-out"
+                      className="flex items-center justify-between sticky z-20 bg-gray-50/95 backdrop-blur-sm py-1.5 mb-2 transition-[top] duration-300 ease-in-out"
                     >
-                      {format(headerDate, "EEEE, d 'de' MMMM", { locale: es })}
-                    </h3>
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        {format(headerDate, "EEEE, d 'de' MMMM", { locale: es })}
+                      </h3>
+                      {(() => {
+                        const net = groupItems.reduce((sum, t) =>
+                          t.type === 'contribution' ? sum + t.amount : sum - t.amount, 0);
+                        return (
+                          <span className={cn(
+                            'text-xs font-bold tabular-nums',
+                            net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-500' : 'text-gray-400',
+                          )}>
+                            {net > 0 ? '+' : ''}{formatCurrency(net)}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                       {/* Header tabla desktop */}
                       <div className="hidden lg:grid lg:grid-cols-[auto_1fr_180px_150px_120px_140px] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
