@@ -80,7 +80,7 @@ export default function ActivityDetail() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
 
       {/* HEADER */}
       <header

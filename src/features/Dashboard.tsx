@@ -290,7 +290,7 @@ export default function Dashboard() {
   const myStats = userStats.find(s => s.userId === currentUser?.id);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
 
       {/* HEADER */}
       <header
@@ -507,7 +507,7 @@ export default function Dashboard() {
                     <Tooltip
                       cursor={{ fill: '#f3f4f6', radius: 8 }}
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                      formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Total gastado']}
+                      formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Total gastado']}
                       labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
                     />
                     <Bar dataKey="total" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={44}>
@@ -771,7 +771,7 @@ export default function Dashboard() {
                       />
                       <Tooltip
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                        formatter={(value: number | undefined) => [formatCurrency(value ?? 0), '']}
+                        formatter={(value) => [formatCurrency(Number(value ?? 0)), '']}
                         labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
                       />
                       {contributionLineData.contributors.map((c, i) => {

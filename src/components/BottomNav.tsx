@@ -20,7 +20,7 @@ export default function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] z-50 safe-area-inset-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-around items-end h-16 sm:h-[4.5rem] px-1">
           {navItems.map((item) => {

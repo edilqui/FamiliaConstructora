@@ -40,7 +40,7 @@ export default function Statistics() {
     .slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
       <header

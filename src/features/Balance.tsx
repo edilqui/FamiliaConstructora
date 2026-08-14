@@ -115,7 +115,7 @@ export default function Balance() {
       : { bg: 'bg-emerald-600', light: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
 
       {/* --- HEADER STICKY TIPO APP --- */}
       <header
