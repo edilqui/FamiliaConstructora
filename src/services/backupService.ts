@@ -8,7 +8,8 @@ const COLLECTIONS_TO_BACKUP = [
   'categories',
   'transactions',
   'notifications',
-  'tasks'
+  'tasks',
+  'brassGames'
 ];
 
 export interface BackupData {

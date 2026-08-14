@@ -17,6 +17,7 @@ import {
   UserCheck,
   HardDrive,
   Building2,
+  Dices,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -95,6 +96,18 @@ export default function Settings() {
       path: '/settings/backup',
       color: 'bg-blue-500',
     },
+    // Solo visible para miembros (no colaboradores)
+    ...(user?.role === 'member'
+      ? [
+          {
+            id: 'brass',
+            label: 'Brass Birmingham',
+            icon: Dices,
+            path: '/settings/brass',
+            color: 'bg-amber-600',
+          },
+        ]
+      : []),
   ];
 
   const appOptions: SettingOption[] = [
@@ -178,7 +191,7 @@ export default function Settings() {
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
 
       {/* --- HEADER STICKY --- */}
       <header

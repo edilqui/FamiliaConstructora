@@ -14,6 +14,8 @@ import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
 import BackupManager from './features/BackupManager';
+import BrassBirmingham from './features/BrassBirmingham';
+import BrassHistory from './features/BrassHistory';
 import ConstructionManager from './features/ConstructionManager';
 import ActivityDetail from './features/ActivityDetail';
 import PendingApproval from './features/PendingApproval';
@@ -196,6 +198,26 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <BackupManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/brass"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <BrassBirmingham />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/brass/history"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <BrassHistory />
               </Layout>
             </ProtectedRoute>
           }

@@ -137,3 +137,55 @@ export interface Task {
   createdByName: string; // Nombre del usuario que creó la tarea
   completedAt?: Date;
 }
+
+// --- BRASS BIRMINGHAM ---
+export type BrassEra = 'canal' | 'rail';
+export type BrassGameStatus = 'active' | 'finished' | 'discarded';
+// 'playing' = turno corriendo, 'paused' = cronómetro detenido,
+// 'roundEnd' = ingresando gastos de la ronda, 'eraEnd' = pregunta de continuar a ferrocarril,
+// 'scoring' = ingresando puntos de victoria finales
+export type BrassPhase = 'playing' | 'paused' | 'roundEnd' | 'eraEnd' | 'scoring';
+
+export interface BrassPlayer {
+  userId: string;
+  name: string;
+  totalTimeMs: number; // tiempo acumulado de todos sus turnos
+  turnCount: number;
+  overtimeCount: number; // turnos en que superó el límite
+  overtimeTotalMs: number; // total de tiempo en exceso
+  points?: number; // PV finales (solo al terminar)
+  position?: number; // 1 = ganador; empates comparten posición
+  avgTurnMs?: number; // promedio por turno (calculado al guardar)
+}
+
+export interface BrassRoundRecord {
+  era: BrassEra;
+  round: number;
+  spending: Record<string, number>; // userId -> monedas gastadas en la ronda
+}
+
+export interface BrassGame {
+  id: string;
+  status: BrassGameStatus;
+  phase: BrassPhase;
+  players: BrassPlayer[]; // el orden del array ES el orden de turno actual
+  turnLimitSec: number;
+  roundsPerEra: number;
+  era: BrassEra;
+  round: number; // 1-based dentro de la era
+  currentPlayerIndex: number;
+  turnStartedAt: number | null; // epoch ms; null si pausado o entre rondas
+  turnAccumulatedMs: number; // tiempo del turno actual acumulado antes de pausas
+  gameStartedAt: number; // epoch ms
+  rounds: BrassRoundRecord[]; // gastos registrados de cada ronda
+  undoSnapshot: string | null; // JSON del estado previo a "Siguiente jugador"
+  undoAt: number | null; // epoch ms de cuándo se creó el snapshot
+  playerCount: number;
+  createdBy: string;
+  updatedAt: Date;
+  // Campos de resultado (al pasar a 'finished')
+  finishedAt?: Date;
+  durationMs?: number;
+  playedRailEra?: boolean;
+  winnerIds?: string[]; // array por si hay empate en PV
+}
