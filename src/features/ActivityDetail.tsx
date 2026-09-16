@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
 import {
-  ArrowLeft, HardHat, Tag, ArrowDownCircle, Receipt,
+  ArrowLeft, HardHat, Tag, ArrowDownCircle, Receipt, Loader2,
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -21,8 +22,9 @@ const formatShort = (v: number) => {
 export default function ActivityDetail() {
   const { activityId } = useParams<{ activityId: string }>();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/obra');
   const { transactions, categories } = useDashboardData();
-  const { stages, activities } = useConstructionData();
+  const { stages, activities, loading } = useConstructionData();
 
   const activity = activities.find(a => a.id === activityId);
   const stage = activity ? stages.find(s => s.id === activity.stageId) : null;
@@ -62,6 +64,15 @@ export default function ActivityDetail() {
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
+  // Evita el flash de "no encontrada" mientras los datos aún cargan
+  if (loading && !activity) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
   if (!activity) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
@@ -93,8 +104,9 @@ export default function ActivityDetail() {
       >
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/obra')}
-            className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+            onClick={goBack}
+            aria-label="Volver"
+            className="p-2.5 -ml-1 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>

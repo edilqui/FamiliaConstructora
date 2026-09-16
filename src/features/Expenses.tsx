@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useModalHistory } from '../hooks/useModalHistory';
+import { toast } from '../store/useToastStore';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -18,7 +20,7 @@ import ActivitySelector from '../components/ActivitySelector';
 import { bulkUpdateTransactions, bulkClearActivityFromTransactions } from '../services/transactionService';
 
 export default function Expenses() {
-  const { transactions, projects, categories, totalContributions, totalExpenses } = useDashboardData();
+  const { transactions, projects, categories, totalContributions, totalExpenses, totalInBox } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const user = useAuthStore((state) => state.user);
 
@@ -114,6 +116,7 @@ export default function Expenses() {
     setIsBulkSaving(true); setBulkError('');
     try {
       await bulkUpdateTransactions(selectedExpenseIds, { categoryId: bulkCategoryId, categoryName: bulkCategoryName });
+      toast(`Categoría aplicada a ${selectedExpenseIds.length} gasto${selectedExpenseIds.length !== 1 ? 's' : ''}`);
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
     finally { setIsBulkSaving(false); }
@@ -128,6 +131,7 @@ export default function Expenses() {
         stageId: bulkStageId, stageName: bulkStageName,
         activityId: bulkActivityId, activityName: bulkActivityName,
       });
+      toast(`Actividad aplicada a ${selectedExpenseIds.length} gasto${selectedExpenseIds.length !== 1 ? 's' : ''}`);
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
     finally { setIsBulkSaving(false); }
@@ -138,10 +142,35 @@ export default function Expenses() {
     setIsBulkSaving(true); setBulkError('');
     try {
       await bulkClearActivityFromTransactions(selectedExpenseIds);
+      toast('Asociación de obra eliminada');
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
     finally { setIsBulkSaving(false); }
   };
+
+  // ── Atrás del sistema: cierra búsqueda, selección, sheets y FAB ────────────
+  useModalHistory(showSearch, () => { setShowSearch(false); setSearchTerm(''); setShowFilters(false); });
+  useModalHistory(isSelectionMode, exitSelectionMode);
+  useModalHistory(bulkAction !== 'none', () => setBulkAction('none'));
+
+  // ── Saldo de caja después de cada movimiento ────────────────────────────────
+  // Se calcula sobre TODAS las transacciones en orden cronológico (con fecha de
+  // registro como desempate), independiente de los filtros activos, para que
+  // cada fila muestre cuánto quedó realmente en caja tras ese movimiento.
+  const runningBalanceById = useMemo(() => {
+    const sorted = [...transactions].sort((a, b) =>
+      a.date.getTime() - b.date.getTime() ||
+      a.createdAt.getTime() - b.createdAt.getTime() ||
+      a.id.localeCompare(b.id)
+    );
+    const map = new Map<string, number>();
+    let balance = 0;
+    for (const t of sorted) {
+      balance += t.type === 'contribution' ? t.amount : -t.amount;
+      map.set(t.id, balance);
+    }
+    return map;
+  }, [transactions]);
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredTransactions = useMemo(() => {
@@ -219,7 +248,8 @@ export default function Expenses() {
           <div className="flex items-center gap-3 min-h-[40px]">
             <button
               onClick={exitSelectionMode}
-              className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+              aria-label="Salir del modo selección"
+              className="p-2.5 -ml-1 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-gray-700" />
             </button>
@@ -251,7 +281,8 @@ export default function Expenses() {
               <div className="flex items-center gap-2 min-h-[40px]">
                 <button
                   onClick={() => { setShowSearch(false); setSearchTerm(''); setShowFilters(false); }}
-                  className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+                  aria-label="Cerrar búsqueda"
+                  className="p-2.5 -ml-1 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
                 >
                   <ArrowLeft className="w-5 h-5 text-gray-700" />
                 </button>
@@ -275,17 +306,24 @@ export default function Expenses() {
             ) : (
               /* ── Modo normal ── */
               <div className="flex items-center gap-1 min-h-[40px]">
-                <h1 className="text-lg lg:text-2xl font-bold text-gray-900 flex-1">Historial</h1>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg lg:text-2xl font-bold text-gray-900 leading-tight">Movimientos</h1>
+                  <p className="text-xs text-gray-500 leading-tight">
+                    En caja: <span className={cn('font-bold tabular-nums', totalInBox < 0 ? 'text-red-600' : 'text-emerald-700')}>{formatCurrency(totalInBox)}</span>
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowSearch(true)}
-                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                  aria-label="Buscar movimientos"
+                  className="p-2.5 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
                 >
                   <Search className="w-5 h-5" />
                 </button>
                 <NotificationButton />
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={cn('p-2 rounded-full transition-colors relative', hasActiveFilters ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100')}
+                  aria-label="Filtrar movimientos"
+                  className={cn('p-2.5 rounded-full transition-colors relative', hasActiveFilters ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100')}
                 >
                   <Filter className="w-5 h-5" />
                   {hasActiveFilters && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />}
@@ -455,11 +493,19 @@ export default function Expenses() {
                                   : <span className="text-gray-400">{format(t.date, 'HH:mm')}</span>}
                               </div>
 
-                              {/* Monto */}
+                              {/* Monto + saldo en caja tras el movimiento */}
                               <div className="text-right flex-shrink-0">
-                                <p className={cn('text-sm lg:text-base font-bold', isExpense ? 'text-gray-900' : 'text-emerald-600')}>
+                                <p className={cn('text-sm lg:text-base font-bold tabular-nums', isExpense ? 'text-gray-900' : 'text-emerald-600')}>
                                   {isExpense ? '-' : '+'}{formatCurrency(t.amount || 0)}
                                 </p>
+                                {(() => {
+                                  const boxAfter = runningBalanceById.get(t.id);
+                                  return boxAfter !== undefined ? (
+                                    <p className="text-[11px] mt-0.5 text-gray-500 tabular-nums">
+                                      Caja: <span className={cn('font-semibold', boxAfter < 0 ? 'text-red-600' : 'text-gray-700')}>{formatCurrency(boxAfter)}</span>
+                                    </p>
+                                  ) : null;
+                                })()}
                                 <p className="text-[10px] text-gray-400 mt-0.5 lg:hidden">
                                   {t.quantity && t.unitPrice
                                     ? <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
@@ -504,7 +550,7 @@ export default function Expenses() {
 
       {/* ── MENÚ BULK (bottom sheet) ── */}
       {bulkAction === 'menu' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('none')} />
           <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1" />
@@ -548,7 +594,7 @@ export default function Expenses() {
 
       {/* ── MODAL BULK CATEGORÍA ── */}
       {bulkAction === 'category' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('menu')} />
           <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />
@@ -598,7 +644,7 @@ export default function Expenses() {
 
       {/* ── MODAL BULK ACTIVIDAD ── */}
       {bulkAction === 'activity' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('menu')} />
           <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />

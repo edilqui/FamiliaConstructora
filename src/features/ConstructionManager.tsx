@@ -3,8 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
-  DollarSign, PauseCircle, LayoutList,
+  DollarSign, PauseCircle, LayoutList, ArrowLeft,
 } from 'lucide-react';
+import { useModalHistory } from '../hooks/useModalHistory';
+import { useSmartBack } from '../hooks/useSmartBack';
+import { toast } from '../store/useToastStore';
+import AmountInput from '../components/AmountInput';
 import { useConstructionData } from '../hooks/useConstructionData';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
@@ -111,6 +115,13 @@ export default function ConstructionManager() {
   const [deleteError, setDeleteError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // El atrás del sistema cierra los modales en lugar de salir de la pantalla
+  const goBack = useSmartBack('/settings');
+  useModalHistory(showStageModal, () => setShowStageModal(false));
+  useModalHistory(showActivityModal, () => setShowActivityModal(false));
+  useModalHistory(deletingStageId !== null, () => setDeletingStageId(null));
+  useModalHistory(deletingActivityId !== null, () => setDeletingActivityId(null));
+
   // ── derived data ──────────────────────────────────────────────────────────
 
   const spentByActivity = useMemo(() => {
@@ -157,7 +168,7 @@ export default function ConstructionManager() {
     setStageForm({
       name: stage.name,
       projectId: stage.projectId,
-      estimatedBudget: stage.estimatedBudget > 0 ? stage.estimatedBudget.toString() : '',
+      estimatedBudget: stage.estimatedBudget > 0 ? String(Math.round(stage.estimatedBudget)) : '',
       status: stage.status,
     });
     setStageError('');
@@ -190,6 +201,7 @@ export default function ConstructionManager() {
           order,
         });
       }
+      toast(editingStage ? 'Etapa actualizada' : 'Etapa creada');
       setShowStageModal(false);
     } catch {
       setStageError('Error al guardar. Intenta nuevamente.');
@@ -206,6 +218,7 @@ export default function ConstructionManager() {
       if (!result.success) {
         setDeleteError(result.message);
       } else {
+        toast('Etapa eliminada');
         setDeletingStageId(null);
       }
     } finally {
@@ -228,7 +241,7 @@ export default function ConstructionManager() {
     setActivityStageId(activity.stageId);
     setActivityForm({
       name: activity.name,
-      estimatedBudget: activity.estimatedBudget > 0 ? activity.estimatedBudget.toString() : '',
+      estimatedBudget: activity.estimatedBudget > 0 ? String(Math.round(activity.estimatedBudget)) : '',
       status: activity.status,
       progressPercent: activity.progressPercent.toString(),
     });
@@ -265,6 +278,7 @@ export default function ConstructionManager() {
           order,
         });
       }
+      toast(editingActivity ? 'Actividad actualizada' : 'Actividad creada');
       setShowActivityModal(false);
     } catch {
       setActivityError('Error al guardar. Intenta nuevamente.');
@@ -281,6 +295,7 @@ export default function ConstructionManager() {
       if (!result.success) {
         setDeleteError(result.message);
       } else {
+        toast('Actividad eliminada');
         setDeletingActivityId(null);
       }
     } finally {
@@ -344,7 +359,7 @@ export default function ConstructionManager() {
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={() => toggleStage(stage.id)}
-              className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors py-2.5 pr-2"
             >
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               {stageActivities.length} actividad{stageActivities.length !== 1 ? 'es' : ''}
@@ -352,15 +367,17 @@ export default function ConstructionManager() {
             <div className="flex-1" />
             <button
               onClick={() => openEditStage(stage)}
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              aria-label={`Editar etapa ${stage.name}`}
+              className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
             >
-              <Edit2 className="w-3.5 h-3.5" />
+              <Edit2 className="w-[18px] h-[18px]" />
             </button>
             <button
               onClick={() => { setDeletingStageId(stage.id); setDeleteError(''); }}
-              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              aria-label={`Eliminar etapa ${stage.name}`}
+              className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>
@@ -405,13 +422,21 @@ export default function ConstructionManager() {
             <HardHat className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
             <span className="text-sm font-medium text-gray-800 truncate">{activity.name}</span>
           </button>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <StatusBadge status={activity.status} type="activity" />
-            <button onClick={() => openEditActivity(activity)} className="p-1 text-gray-400 hover:text-blue-600 rounded-lg transition-colors">
-              <Edit2 className="w-3 h-3" />
+            <button
+              onClick={() => openEditActivity(activity)}
+              aria-label={`Editar actividad ${activity.name}`}
+              className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Edit2 className="w-[18px] h-[18px]" />
             </button>
-            <button onClick={() => { setDeletingActivityId(activity.id); setDeleteError(''); }} className="p-1 text-gray-400 hover:text-red-600 rounded-lg transition-colors">
-              <Trash2 className="w-3 h-3" />
+            <button
+              onClick={() => { setDeletingActivityId(activity.id); setDeleteError(''); }}
+              aria-label={`Eliminar actividad ${activity.name}`}
+              className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>
@@ -588,6 +613,13 @@ export default function ConstructionManager() {
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
+            <button
+              onClick={goBack}
+              aria-label="Volver"
+              className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
             <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
@@ -686,13 +718,13 @@ export default function ConstructionManager() {
 
       {/* ── Stage Modal ── */}
       {showStageModal && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowStageModal(false)} />
           <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-3xl">
               <h2 className="text-lg font-bold text-gray-900">{editingStage ? 'Editar Etapa' : 'Nueva Etapa'}</h2>
-              <button onClick={() => setShowStageModal(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
+              <button onClick={() => setShowStageModal(false)} aria-label="Cerrar" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
@@ -731,14 +763,12 @@ export default function ConstructionManager() {
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5 ml-1">Presupuesto Estimado</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <AmountInput
                     value={stageForm.estimatedBudget}
-                    onChange={(e) => setStageForm({ ...stageForm, estimatedBudget: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full pl-8 pr-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
+                    onChange={(v) => setStageForm({ ...stageForm, estimatedBudget: v })}
+                    placeholder="0"
+                    aria-label="Presupuesto estimado de la etapa"
+                    className="w-full pl-8 pr-4 bg-gray-50 border border-gray-200 rounded-xl py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
                   />
                 </div>
               </div>
@@ -770,13 +800,13 @@ export default function ConstructionManager() {
 
       {/* ── Activity Modal ── */}
       {showActivityModal && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowActivityModal(false)} />
           <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-3xl">
               <h2 className="text-lg font-bold text-gray-900">{editingActivity ? 'Editar Actividad' : 'Nueva Actividad'}</h2>
-              <button onClick={() => setShowActivityModal(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
+              <button onClick={() => setShowActivityModal(false)} aria-label="Cerrar" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
@@ -803,14 +833,12 @@ export default function ConstructionManager() {
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5 ml-1">Presupuesto Estimado</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <AmountInput
                     value={activityForm.estimatedBudget}
-                    onChange={(e) => setActivityForm({ ...activityForm, estimatedBudget: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full pl-8 pr-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
+                    onChange={(v) => setActivityForm({ ...activityForm, estimatedBudget: v })}
+                    placeholder="0"
+                    aria-label="Presupuesto estimado de la actividad"
+                    className="w-full pl-8 pr-4 bg-gray-50 border border-gray-200 rounded-xl py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
                   />
                 </div>
               </div>
@@ -825,6 +853,8 @@ export default function ConstructionManager() {
                   step="5"
                   value={activityForm.progressPercent}
                   onChange={(e) => setActivityForm({ ...activityForm, progressPercent: e.target.value })}
+                  aria-label="Avance físico"
+                  aria-valuetext={`${activityForm.progressPercent}%`}
                   className="w-full accent-orange-500"
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -858,14 +888,23 @@ export default function ConstructionManager() {
 
       {/* ── Delete Stage Confirm ── */}
       {deletingStageId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeletingStageId(null)} />
           <div className="relative bg-white rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95">
             <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">
               <Trash2 className="w-7 h-7 text-red-600" />
             </div>
             <h3 className="text-lg font-bold text-gray-900">¿Eliminar etapa?</h3>
-            <p className="text-sm text-gray-500">Primero debes eliminar todas sus actividades.</p>
+            {(() => {
+              const count = activities.filter(a => a.stageId === deletingStageId).length;
+              return count > 0 ? (
+                <p className="text-sm text-amber-700 bg-amber-50 rounded-xl p-2">
+                  Esta etapa tiene {count} actividad{count !== 1 ? 'es' : ''}. Elimínalas primero para poder borrarla.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer.</p>
+              );
+            })()}
             {deleteError && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-xl">{deleteError}</p>}
             <div className="flex gap-3">
               <button onClick={() => setDeletingStageId(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-sm">Cancelar</button>
@@ -883,7 +922,7 @@ export default function ConstructionManager() {
 
       {/* ── Delete Activity Confirm ── */}
       {deletingActivityId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeletingActivityId(null)} />
           <div className="relative bg-white rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95">
             <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">

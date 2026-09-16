@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useModalHistory } from '../hooks/useModalHistory';
 import {
   exportAllData,
   generateBackupFileName,
@@ -53,6 +54,9 @@ export default function BackupManager() {
 
   // Modal de confirmación
   const [showImportConfirm, setShowImportConfirm] = useState(false);
+
+  // El atrás del sistema cierra la confirmación en lugar de salir de la pantalla
+  useModalHistory(showImportConfirm, () => setShowImportConfirm(false));
 
   const canShare = canShareFiles();
 
@@ -480,7 +484,7 @@ export default function BackupManager() {
 
       {/* --- MODAL DE CONFIRMACIÓN --- */}
       {showImportConfirm && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/50"

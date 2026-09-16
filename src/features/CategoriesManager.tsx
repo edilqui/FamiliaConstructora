@@ -27,6 +27,9 @@ import {
   getAllCategoryUsageCounts
 } from '../services/categoryService';
 import type { Category } from '../types';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useSmartBack } from '../hooks/useSmartBack';
+import { useModalHistory } from '../hooks/useModalHistory';
 
 interface CategoryFormData {
   id?: string;
@@ -40,6 +43,7 @@ type FormType = 'group' | 'category' | null;
 
 export default function CategoriesManager() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/settings');
   const { categories } = useDashboardData();
 
   // Estados
@@ -161,6 +165,9 @@ export default function CategoriesManager() {
     setMessage('');
   };
 
+  // El atrás del sistema cierra el formulario en lugar de salir de la pantalla
+  useModalHistory(showForm, handleCloseForm);
+
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setMessage(msg);
     setMessageType(type);
@@ -199,17 +206,23 @@ export default function CategoriesManager() {
     }
   };
 
-  const handleDelete = async (category: Category) => {
-    if (!window.confirm(`¿Eliminar "${category.name}"?`)) return;
+  // Confirmación con modal propio (antes usaba window.confirm nativo)
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+
+  const handleDelete = (category: Category) => setCategoryToDelete(category);
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
     setLoading(true);
     try {
-      const result = await deleteCategory(category.id);
+      const result = await deleteCategory(categoryToDelete.id);
       if (result.success) showFeedback(result.message, 'success');
       else showFeedback(result.message, 'error');
     } catch (error) {
       showFeedback('Error al eliminar', 'error');
     } finally {
       setLoading(false);
+      setCategoryToDelete(null);
     }
   };
 
@@ -229,8 +242,9 @@ export default function CategoriesManager() {
       >
         <div className="flex items-center gap-3 mb-3">
           <button
-            onClick={() => navigate('/settings')}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            onClick={goBack}
+            aria-label="Volver a Configuración"
+            className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -263,6 +277,18 @@ export default function CategoriesManager() {
           </div>
         </div>
       )}
+
+      {/* Confirmación de borrado unificada */}
+      <ConfirmDialog
+        open={categoryToDelete !== null}
+        title={`¿Eliminar "${categoryToDelete?.name ?? ''}"?`}
+        message={categoryToDelete?.isGroup
+          ? 'Se eliminará el grupo. Las categorías que contiene quedarán sin grupo.'
+          : 'Si tiene gastos asociados no podrá eliminarse.'}
+        loading={loading}
+        onConfirm={confirmDelete}
+        onCancel={() => setCategoryToDelete(null)}
+      />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-7xl mx-auto space-y-4">
 

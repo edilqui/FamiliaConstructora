@@ -225,7 +225,8 @@ export default function UserApprovalManager() {
       >
         <button
           onClick={() => navigate('/settings')}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
+          aria-label="Volver a Configuración"
+          className="p-2.5 hover:bg-gray-100 rounded-full transition-colors -ml-1"
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>

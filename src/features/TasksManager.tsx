@@ -18,6 +18,8 @@ import {
 import type { Task } from '../types';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useModalHistory } from '../hooks/useModalHistory';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 // Función para formatear fecha como "Hoy", "Ayer", o fecha completa
 const formatDateGroup = (date: Date): string => {
@@ -53,6 +55,7 @@ const groupTasksByDate = (tasks: Task[]): Map<string, Task[]> => {
 
 export default function TasksManager() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/settings');
   const user = useAuthStore((state) => state.user);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -70,6 +73,10 @@ export default function TasksManager() {
   // Estado para confirmación de eliminación
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // El atrás del sistema cierra los modales en lugar de salir de la pantalla
+  useModalHistory(editingTask !== null, () => setEditingTask(null));
+  useModalHistory(taskToDelete !== null, () => setTaskToDelete(null));
 
   // Suscripción en tiempo real a todas las tareas
   useEffect(() => {
@@ -245,8 +252,9 @@ export default function TasksManager() {
         )}
       >
         <button
-          onClick={() => navigate('/settings')}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
+          onClick={goBack}
+          aria-label="Volver a Configuración"
+          className="p-2.5 hover:bg-gray-100 rounded-full transition-colors -ml-1"
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
@@ -375,7 +383,7 @@ export default function TasksManager() {
 
       {/* --- MODAL DE EDICIÓN --- */}
       {editingTask && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/50"
@@ -431,7 +439,7 @@ export default function TasksManager() {
 
       {/* --- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN --- */}
       {taskToDelete && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/50"

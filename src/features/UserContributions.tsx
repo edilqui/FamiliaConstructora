@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -18,6 +19,7 @@ import ContributionForm from './ContributionForm';
 export default function UserContributions() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const { users, userStats, transactions, projects, memberCount } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
 
@@ -119,8 +121,9 @@ export default function UserContributions() {
       >
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
+            onClick={goBack}
+            aria-label="Volver"
+            className="p-2.5 hover:bg-gray-100 rounded-full transition-colors -ml-1"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>

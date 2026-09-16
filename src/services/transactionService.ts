@@ -64,22 +64,27 @@ export const addTransaction = async (params: AddTransactionParams): Promise<void
 
     const docRef = await addDoc(transactionsRef, data);
 
-    // Crear notificación
-    const notificationType = type === 'contribution' ? 'contribution_created' : 'expense_created';
-    const actionText = type === 'contribution' ? 'registró un aporte' : 'registró un gasto';
-    const message = `${registeredByName} ${actionText} en ${project}`;
+    // La notificación es secundaria: si falla, la transacción YA se guardó y no
+    // debe reportarse como error (el usuario reintentaría y duplicaría el movimiento).
+    try {
+      const notificationType = type === 'contribution' ? 'contribution_created' : 'expense_created';
+      const actionText = type === 'contribution' ? 'registró un aporte' : 'registró un gasto';
+      const message = `${registeredByName} ${actionText} en ${project}`;
 
-    await createNotification({
-      type: notificationType,
-      message,
-      createdBy: registeredBy,
-      createdByName: registeredByName,
-      transactionId: docRef.id,
-      transactionDescription: description,
-      amount,
-      projectName: project,
-      excludeUserId: registeredBy // No notificar al usuario que creó la transacción
-    });
+      await createNotification({
+        type: notificationType,
+        message,
+        createdBy: registeredBy,
+        createdByName: registeredByName,
+        transactionId: docRef.id,
+        transactionDescription: description,
+        amount,
+        projectName: project,
+        excludeUserId: registeredBy // No notificar al usuario que creó la transacción
+      });
+    } catch (notificationError) {
+      console.error('Transacción guardada, pero falló la notificación:', notificationError);
+    }
 
     console.log('Transacción agregada exitosamente');
   } catch (error) {
@@ -152,21 +157,25 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
 
     await updateDoc(transactionRef, data);
 
-    // Crear notificación
-    const actionText = type === 'contribution' ? 'editó un aporte' : 'editó un gasto';
-    const message = `${updatedByName} ${actionText} en ${project}`;
+    // Notificación secundaria: no debe convertir una edición exitosa en "error"
+    try {
+      const actionText = type === 'contribution' ? 'editó un aporte' : 'editó un gasto';
+      const message = `${updatedByName} ${actionText} en ${project}`;
 
-    await createNotification({
-      type: 'transaction_edited',
-      message,
-      createdBy: updatedBy,
-      createdByName: updatedByName,
-      transactionId: id,
-      transactionDescription: description,
-      amount,
-      projectName: project,
-      excludeUserId: updatedBy
-    });
+      await createNotification({
+        type: 'transaction_edited',
+        message,
+        createdBy: updatedBy,
+        createdByName: updatedByName,
+        transactionId: id,
+        transactionDescription: description,
+        amount,
+        projectName: project,
+        excludeUserId: updatedBy
+      });
+    } catch (notificationError) {
+      console.error('Transacción actualizada, pero falló la notificación:', notificationError);
+    }
 
     console.log('Transacción actualizada exitosamente');
   } catch (error) {
@@ -209,18 +218,22 @@ export const deleteTransaction = async (params: DeleteTransactionParams): Promis
     const transactionRef = doc(db, 'transactions', id);
     await deleteDoc(transactionRef);
 
-    // Crear notificación
-    const message = `${deletedByName} eliminó una transacción en ${projectName}`;
+    // Notificación secundaria: no debe convertir una eliminación exitosa en "error"
+    try {
+      const message = `${deletedByName} eliminó una transacción en ${projectName}`;
 
-    await createNotification({
-      type: 'transaction_deleted',
-      message,
-      createdBy: deletedBy,
-      createdByName: deletedByName,
-      transactionDescription: description,
-      projectName,
-      excludeUserId: deletedBy
-    });
+      await createNotification({
+        type: 'transaction_deleted',
+        message,
+        createdBy: deletedBy,
+        createdByName: deletedByName,
+        transactionDescription: description,
+        projectName,
+        excludeUserId: deletedBy
+      });
+    } catch (notificationError) {
+      console.error('Transacción eliminada, pero falló la notificación:', notificationError);
+    }
 
     console.log('Transacción eliminada exitosamente');
   } catch (error) {

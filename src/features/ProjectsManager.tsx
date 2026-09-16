@@ -28,6 +28,9 @@ import {
   getAllProjectsStats
 } from '../services/projectService';
 import type { Project } from '../types';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useSmartBack } from '../hooks/useSmartBack';
+import { useModalHistory } from '../hooks/useModalHistory';
 
 interface ProjectFormData {
   id?: string;
@@ -45,6 +48,7 @@ interface ProjectStats {
 
 export default function ProjectsManager() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/settings');
   const { projects } = useDashboardData();
 
   // Estados
@@ -110,6 +114,9 @@ export default function ProjectsManager() {
     setFormData({ name: '', budget: 0, status: 'active' });
   };
 
+  // El atrás del sistema cierra el formulario en lugar de salir de la pantalla
+  useModalHistory(showForm, handleCloseForm);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return showFeedback('Nombre requerido', 'error');
@@ -131,17 +138,23 @@ export default function ProjectsManager() {
     }
   };
 
-  const handleDelete = async (project: Project) => {
-    if (!window.confirm(`¿Eliminar proyecto "${project.name}"?`)) return;
+  // Confirmación con modal propio (antes usaba window.confirm nativo)
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+
+  const handleDelete = (project: Project) => setProjectToDelete(project);
+
+  const confirmDelete = async () => {
+    if (!projectToDelete) return;
     setLoading(true);
     try {
-      const result = await deleteProject(project.id);
+      const result = await deleteProject(projectToDelete.id);
       if (result.success) showFeedback(result.message, 'success');
       else showFeedback(result.message, 'error');
     } catch (error) {
       showFeedback('Error al eliminar', 'error');
     } finally {
       setLoading(false);
+      setProjectToDelete(null);
     }
   };
 
@@ -171,8 +184,9 @@ export default function ProjectsManager() {
       >
         <div className="flex items-center gap-3 mb-3">
           <button
-            onClick={() => navigate('/settings')}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            onClick={goBack}
+            aria-label="Volver a Configuración"
+            className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -191,6 +205,16 @@ export default function ProjectsManager() {
         </div>
       </header>
       <div style={{ height: spacerHeight }} />
+
+      {/* Confirmación de borrado unificada */}
+      <ConfirmDialog
+        open={projectToDelete !== null}
+        title={`¿Eliminar "${projectToDelete?.name ?? ''}"?`}
+        message="Si tiene movimientos asociados no podrá eliminarse."
+        loading={loading}
+        onConfirm={confirmDelete}
+        onCancel={() => setProjectToDelete(null)}
+      />
 
       {/* --- TOAST --- */}
       {message && (

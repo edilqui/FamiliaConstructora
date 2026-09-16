@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Delete, Calculator as CalcIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useModalHistory } from '../hooks/useModalHistory';
 
 interface CalculatorProps {
   onClose: () => void;
@@ -9,6 +10,8 @@ interface CalculatorProps {
 }
 
 export default function Calculator({ onClose, onConfirm, initialValue = '' }: CalculatorProps) {
+  // El atrás del sistema cierra la calculadora (sin cerrar el formulario de abajo)
+  useModalHistory(true, onClose);
   const [display, setDisplay] = useState(initialValue || '0');
   const [previousValue, setPreviousValue] = useState('');
   const [operation, setOperation] = useState<string | null>(null);
@@ -99,9 +102,10 @@ export default function Calculator({ onClose, onConfirm, initialValue = '' }: Ca
     }
   };
 
-  const Button = ({ children, onClick, className = '', variant = 'default' }: any) => (
+  const Button = ({ children, onClick, className = '', variant = 'default', ...rest }: any) => (
     <button
       onClick={onClick}
+      {...rest}
       className={cn(
         'h-16 rounded-xl font-bold text-lg transition-all active:scale-95',
         variant === 'number' && 'bg-gray-100 hover:bg-gray-200 text-gray-900',
@@ -116,7 +120,7 @@ export default function Calculator({ onClose, onConfirm, initialValue = '' }: Ca
   );
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 pb-20 sm:pb-4">
+    <div role="dialog" aria-modal="true" aria-label="Calculadora" className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
@@ -129,7 +133,7 @@ export default function Calculator({ onClose, onConfirm, initialValue = '' }: Ca
             <CalcIcon className="w-5 h-5 text-blue-600" />
             <h3 className="text-lg font-bold text-gray-900">Calculadora</h3>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Cerrar calculadora" className="p-2.5 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
@@ -154,7 +158,7 @@ export default function Calculator({ onClose, onConfirm, initialValue = '' }: Ca
           <Button onClick={handleClear} variant="clear" className="col-span-2">
             C
           </Button>
-          <Button onClick={handleDelete} variant="operation">
+          <Button onClick={handleDelete} variant="operation" aria-label="Borrar último dígito">
             <Delete className="w-5 h-5 mx-auto" />
           </Button>
           <Button onClick={() => handleOperation('÷')} variant="operation">

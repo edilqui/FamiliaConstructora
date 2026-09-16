@@ -13,29 +13,16 @@ import NotificationButton from '../components/NotificationButton';
 type TabType = 'statistics' | 'categories';
 
 export default function Statistics() {
-  const { userStats, memberStats, collaboratorStats, projectStats, transactions, totalInBox, loading } = useDashboardData();
+  const {
+    memberStats, collaboratorStats, projectStats, transactions,
+    totalInBox, totalContributions, totalExpenses, loading,
+  } = useDashboardData();
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  // Calcular totales (Asegurando que no haya NaN)
-  const totalContributions = transactions
-    .filter((t) => t.type === 'contribution')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-  const totalExpenses = transactions
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-  // Últimas 5 transacciones (Solo necesitamos un resumen aquí, no las 20)
-  const recentTransactions = transactions
+  // Últimas 5 transacciones. Copia antes de ordenar: el array viene compartido
+  // desde useDashboardData y ordenarlo in-place desordenaba las otras pantallas.
+  const recentTransactions = [...transactions]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 5);
 
@@ -98,8 +85,15 @@ export default function Statistics() {
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
 
+        {/* Cargando: el header y los tabs siguen visibles */}
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        )}
+
         {/* Tab: Estadísticas */}
-        {activeTab === 'statistics' && (
+        {!loading && activeTab === 'statistics' && (
           <>
             {/* --- TARJETAS DE RESUMEN (KPIs) --- */}
             <div className="grid grid-cols-2 gap-3">
@@ -176,7 +170,7 @@ export default function Statistics() {
                         )}>
                           {isPositive ? '+' : ''}{formatCurrency(stat.balance)}
                         </p>
-                        <p className="text-[10px] text-gray-400 uppercase font-medium">
+                        <p className="text-[11px] text-gray-500 uppercase font-medium">
                           {isPositive ? 'A favor' : 'Debe'}
                         </p>
                       </div>
@@ -213,7 +207,7 @@ export default function Statistics() {
                           <p className="font-bold text-sm text-emerald-600">
                             +{formatCurrency(stat.totalContributed)}
                           </p>
-                          <p className="text-[10px] text-gray-400 uppercase font-medium">
+                          <p className="text-[11px] text-gray-500 uppercase font-medium">
                             Aportado
                           </p>
                         </div>
@@ -252,7 +246,7 @@ export default function Statistics() {
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1 text-right">{percentage.toFixed(1)}% del total</p>
+                      <p className="text-[11px] text-gray-500 mt-1 text-right">{percentage.toFixed(1)}% del total</p>
                     </div>
                   );
                 })}
@@ -330,7 +324,7 @@ export default function Statistics() {
         )}
 
         {/* Tab: Categorías */}
-        {activeTab === 'categories' && <CategoryReport />}
+        {!loading && activeTab === 'categories' && <CategoryReport />}
       </div>
     </div>
   );

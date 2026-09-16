@@ -25,6 +25,7 @@ import {
 import type { User, BrassPlayer } from '../types';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useModalHistory } from '../hooks/useModalHistory';
 
 const TURN_LIMIT_PRESETS = [60, 90, 120, 180];
 
@@ -73,6 +74,9 @@ export default function BrassBirmingham() {
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // El atrás del sistema cierra la confirmación en lugar de salir de la pantalla
+  useModalHistory(showDiscardConfirm, () => setShowDiscardConfirm(false));
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
@@ -514,7 +518,7 @@ export default function BrassBirmingham() {
 
       {/* --- MODAL: GASTOS DE LA RONDA --- */}
       {game && game.phase === 'roundEnd' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
           <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
             <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -599,7 +603,7 @@ export default function BrassBirmingham() {
 
       {/* --- MODAL: FIN DE LA ERA DE CANALES --- */}
       {game && game.phase === 'eraEnd' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
           <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
             <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -637,7 +641,7 @@ export default function BrassBirmingham() {
 
       {/* --- MODAL: PUNTOS DE VICTORIA FINALES --- */}
       {game && game.phase === 'scoring' && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
           <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
             <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -696,7 +700,7 @@ export default function BrassBirmingham() {
 
       {/* --- MODAL: CONFIRMAR DESCARTE --- */}
       {showDiscardConfirm && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowDiscardConfirm(false)}

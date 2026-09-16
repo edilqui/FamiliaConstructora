@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
   Search, Filter, Minus, Trash2, ArrowLeft,
-  FolderKanban, Receipt, ArrowDownCircle
+  FolderKanban, Receipt, ArrowDownCircle, Loader2
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import TransactionForm from './TransactionForm';
@@ -14,7 +15,8 @@ import TransactionForm from './TransactionForm';
 export default function ProjectExpenses() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { transactions, projects, categories } = useDashboardData();
+  const goBack = useSmartBack('/');
+  const { transactions, projects, categories, loading } = useDashboardData();
 
   // Estados
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -107,7 +109,16 @@ export default function ProjectExpenses() {
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
-  // --- UI ERROR SI NO EXISTE PROYECTO ---
+  // Mientras cargan los datos no se puede afirmar que el proyecto no existe
+  // (antes aparecía un flash de "Proyecto no encontrado" al abrir por enlace)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   if (!currentProject) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6">
@@ -132,8 +143,9 @@ export default function ProjectExpenses() {
       >
         <div className="flex items-center gap-2 mb-3">
           <button
-            onClick={() => navigate('/')}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            onClick={goBack}
+            aria-label="Volver"
+            className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -144,10 +156,11 @@ export default function ProjectExpenses() {
             </p>
           </div>
           
-          <button 
+          <button
             onClick={() => setShowFilters(!showFilters)}
+            aria-label="Filtrar gastos"
             className={cn(
-              "p-2 rounded-full transition-colors relative",
+              "p-2.5 rounded-full transition-colors relative",
               hasActiveFilters ? "bg-red-50 text-red-600" : "text-gray-400 hover:bg-gray-100"
             )}
           >
@@ -249,7 +262,10 @@ export default function ProjectExpenses() {
               .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime()) // Ordenar grupos descendente
               .map(([dateKey, groupItems]) => (
                 <div key={dateKey}>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1 sticky top-32">
+                  <h3
+                    style={{ top: headerHidden ? 0 : spacerHeight }}
+                    className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1 sticky z-20 bg-gray-50/95 backdrop-blur-sm py-1.5 transition-[top] duration-300 ease-in-out"
+                  >
                     {format(new Date(dateKey), "EEEE, d 'de' MMMM", { locale: es })}
                   </h3>
                   

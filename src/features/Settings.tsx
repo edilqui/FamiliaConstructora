@@ -2,17 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import {
-  Settings as SettingsIcon,
   Tag,
   FolderKanban,
-  Sliders,
-  User,
-  Info,
   LogOut,
   ChevronRight,
   Loader2,
-  Shield,
-  Bell,
   ListTodo,
   UserCheck,
   HardDrive,
@@ -21,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { toast } from '../store/useToastStore';
 
 interface SettingOption {
   id: string;
@@ -44,6 +39,7 @@ export default function Settings() {
       navigate('/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
+      toast('No se pudo cerrar la sesión. Intenta de nuevo.', { type: 'error' });
     } finally {
       setLoggingOut(false);
     }
@@ -110,36 +106,9 @@ export default function Settings() {
       : []),
   ];
 
-  const appOptions: SettingOption[] = [
-    {
-      id: 'general',
-      label: 'Preferencias',
-      icon: Sliders,
-      path: '/settings/general',
-      color: 'bg-gray-500',
-    },
-    {
-      id: 'profile',
-      label: 'Mi Perfil',
-      icon: User,
-      path: '/settings/profile',
-      color: 'bg-purple-500',
-    },
-    {
-      id: 'security', // Un extra visual para rellenar
-      label: 'Seguridad',
-      icon: Shield,
-      path: '/settings/security',
-      color: 'bg-emerald-500',
-    },
-    {
-      id: 'about',
-      label: 'Acerca de',
-      icon: Info,
-      path: '/settings/about',
-      color: 'bg-indigo-500',
-    },
-  ];
+  // Nota: aquí solo van opciones con pantalla real detrás. Las entradas
+  // "Preferencias / Mi Perfil / Seguridad / Acerca de" se quitaron porque sus
+  // rutas no existían y tiraban al usuario al Dashboard sin explicación.
 
   const renderOptionRow = (option: SettingOption, isLast: boolean) => {
     const Icon = option.icon;
@@ -250,16 +219,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* --- GRUPO 3: APP & CUENTA --- */}
-        <div>
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-2">
-            General
-          </h3>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            {appOptions.map((opt, i) => renderOptionRow(opt, i === appOptions.length - 1))}
-          </div>
-        </div>
-
         {/* --- LOGOUT BUTTON --- */}
         <button
           onClick={handleLogout}
@@ -282,8 +241,8 @@ export default function Settings() {
             </div>
           </div>
           <p className="text-sm font-semibold text-gray-900">FamiliaBuilder</p>
-          <p className="text-xs text-gray-400 mt-0.5">Versión 1.0.0 (Beta)</p>
-          <p className="text-[10px] text-gray-300 mt-4">Hecho con ❤️ para la familia</p>
+          <p className="text-xs text-gray-500 mt-0.5">Versión 1.0.0 (Beta)</p>
+          <p className="text-xs text-gray-500 mt-4">Hecho con ❤️ para la familia</p>
         </div>
 
       </div>

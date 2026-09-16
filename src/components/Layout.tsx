@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import BottomNav from './BottomNav';
+import Toaster from './Toaster';
+import OfflineBanner from './OfflineBanner';
 
 interface LayoutProps {
   children: ReactNode;
@@ -24,6 +26,8 @@ export default function Layout({ children }: LayoutProps) {
         {children}
       </main>
       {user && <BottomNav />}
+      <OfflineBanner />
+      <Toaster />
     </div>
   );
 }

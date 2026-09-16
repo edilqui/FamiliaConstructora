@@ -64,6 +64,13 @@ service cloud.firestore {
       allow update, delete: if request.auth != null;
     }
 
+    // Arqueos de caja - conteo físico vs saldo teórico, visible para todos
+    match /cashCounts/{countId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
     // Partidas de Brass Birmingham - todos los autenticados pueden gestionar
     match /brassGames/{gameId} {
       allow read: if request.auth != null;

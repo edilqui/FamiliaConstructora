@@ -32,9 +32,12 @@ export function useScrollAwareHeader(threshold = 60) {
       ticking.current = true;
       requestAnimationFrame(() => {
         const currentScrollY = window.scrollY;
-        if (currentScrollY > lastScrollY.current && currentScrollY > threshold) {
+        const delta = currentScrollY - lastScrollY.current;
+        // Umbral de 10px por gesto: evita que micro-scrolls o el rebote de
+        // iOS hagan parpadear el header.
+        if (delta > 10 && currentScrollY > threshold) {
           setHidden(true);
-        } else if (currentScrollY < lastScrollY.current) {
+        } else if (delta < -10 || currentScrollY <= 0) {
           setHidden(false);
         }
         lastScrollY.current = currentScrollY;

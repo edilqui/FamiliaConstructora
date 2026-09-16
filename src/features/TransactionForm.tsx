@@ -10,6 +10,9 @@ import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
 import CategorySelector from '../components/CategorySelector';
 import ActivitySelector from '../components/ActivitySelector';
+import AmountInput from '../components/AmountInput';
+import { useModalHistory } from '../hooks/useModalHistory';
+import { toast } from '../store/useToastStore';
 
 interface TransactionFormProps {
   onClose: () => void;
@@ -52,12 +55,16 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
 
+  // El atrás del sistema cierra el formulario (y primero la confirmación de borrado)
+  useModalHistory(true, onClose);
+  useModalHistory(showDeleteConfirm, () => setShowDeleteConfirm(false));
+
   // Calcular monto automáticamente en modo detallado
   useEffect(() => {
     if (detailedMode && quantity && unitPrice) {
       const calculatedAmount = parseFloat(quantity) * parseFloat(unitPrice);
       if (!isNaN(calculatedAmount)) {
-        setAmount(calculatedAmount.toFixed(2));
+        setAmount(String(Math.round(calculatedAmount)));
       }
     }
   }, [quantity, unitPrice, detailedMode]);
@@ -67,7 +74,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     if (transactionToEdit) {
       setProjectId(transactionToEdit.projectId || '');
       setCategoryId(transactionToEdit.categoryId || '');
-      setAmount(transactionToEdit.amount.toString());
+      setAmount(String(Math.round(transactionToEdit.amount)));
       setDescription(transactionToEdit.description);
       setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
@@ -94,12 +101,39 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     setLoading(true);
     try {
       const selectedProject = projects.find(p => p.id === transactionToEdit.projectId);
+      const deleted = transactionToEdit; // Copia para poder deshacer
       await deleteTransaction({
-        id: transactionToEdit.id,
+        id: deleted.id,
         deletedBy: user.id,
         deletedByName: user.name,
-        description: transactionToEdit.description,
+        description: deleted.description,
         projectName: selectedProject?.name || 'Proyecto'
+      });
+      toast('Gasto eliminado', {
+        actionLabel: 'Deshacer',
+        onAction: () => {
+          addTransaction({
+            amount: deleted.amount,
+            project: deleted.project,
+            type: deleted.type,
+            projectId: deleted.projectId,
+            categoryId: deleted.categoryId,
+            categoryName: deleted.categoryName,
+            userId: deleted.userId,
+            registeredBy: user.id,
+            registeredByName: user.name,
+            description: deleted.description,
+            notes: deleted.notes,
+            quantity: deleted.quantity,
+            unitPrice: deleted.unitPrice,
+            date: deleted.date,
+            activityId: deleted.activityId,
+            activityName: deleted.activityName,
+            stageId: deleted.stageId,
+            stageName: deleted.stageName,
+          }).then(() => toast('Gasto restaurado'))
+            .catch(() => toast('No se pudo restaurar el gasto', { type: 'error' }));
+        },
       });
       onClose();
     } catch (err) {
@@ -119,7 +153,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     if (!categoryId) return setError('Selecciona una categoría');
     
     const amountValue = parseFloat(amount);
-    if (!amount || amountValue < 0) return setError('Ingresa un monto válido');
+    if (!amount || isNaN(amountValue) || amountValue <= 0) return setError('Ingresa un monto válido');
 
     if (!isEditMode && paymentSource === 'caja' && amountValue > totalInBox) {
       return setError(`Saldo insuficiente. Disponible: ${formatCurrency(totalInBox)}`);
@@ -135,6 +169,11 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       const [year, month, day] = date.split('-').map(Number);
       const [hours, minutes] = time.split(':').map(Number);
       const transactionDate = new Date(year, month - 1, day, hours, minutes);
+
+      if (transactionDate.getTime() > Date.now()) {
+        setLoading(false);
+        return setError('La fecha y hora no pueden ser futuras');
+      }
 
       if (isEditMode && transactionToEdit) {
         await updateTransaction({
@@ -220,6 +259,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           });
         }
       }
+      toast(isEditMode ? 'Cambios guardados' : 'Gasto registrado');
       onClose();
     } catch (err) {
       setError('Error al guardar. Intenta nuevamente.');
@@ -229,7 +269,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bottom-20 sm:items-center justify-center p-0 sm:p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
@@ -242,9 +282,9 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">
-            {isEditMode ? 'Editar Gasto' : 'Registrar Gastoss'}
+            {isEditMode ? 'Editar Gasto' : 'Registrar Gasto'}
           </h2>
-          <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Cerrar formulario" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
@@ -285,7 +325,9 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                     <label className="text-xs font-medium text-blue-700 mb-1.5 block">Cantidad</label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
+                      min="0"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
                       placeholder="0"
@@ -297,12 +339,11 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                     <label className="text-xs font-medium text-blue-700 mb-1.5 block">Precio Unit.</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <AmountInput
                         value={unitPrice}
-                        onChange={(e) => setUnitPrice(e.target.value)}
-                        placeholder="0.00"
+                        onChange={setUnitPrice}
+                        placeholder="0"
+                        aria-label="Precio unitario"
                         className="w-full pl-7 pr-3 py-2 text-lg font-semibold text-gray-900 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
                       />
                     </div>
@@ -319,12 +360,11 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             <div className="relative flex gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
-                <input
-                  type="number"
-                  step="0.01"
+                <AmountInput
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
+                  onChange={setAmount}
+                  placeholder="0"
+                  aria-label="Monto del gasto"
                   className={cn(
                     "w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-gray-50 border-2 rounded-2xl focus:outline-none transition-all placeholder:text-gray-300",
                     detailedMode
@@ -545,14 +585,17 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+                  disabled={loading}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200"
+                  disabled={loading}
+                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Sí, eliminar
                 </button>
               </div>
@@ -566,7 +609,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
         <CalculatorComponent
           onClose={() => setShowCalculator(false)}
           onConfirm={(value) => {
-            setAmount(value);
+            setAmount(String(Math.max(0, Math.round(parseFloat(value) || 0))));
             setShowCalculator(false);
           }}
           initialValue={amount}

@@ -8,8 +8,9 @@ import {
   Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown,
   BarChart3, Filter, X, Check, Users,
   Calendar, ArrowUpRight, ArrowDownRight, Building2, ChevronRight,
-  Tag, WifiOff,
+  Tag,
 } from 'lucide-react';
+import { useModalHistory } from '../hooks/useModalHistory';
 import TransactionForm from './TransactionForm';
 import ContributionForm from './ContributionForm';
 import InitializeDataPanel from '../components/InitializeDataPanel';
@@ -31,16 +32,7 @@ export default function Dashboard() {
   const { stages, activities } = useConstructionData();
   const currentUser = useAuthStore((state) => state.user);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  useEffect(() => {
-    const up = () => setIsOnline(true);
-    const down = () => setIsOnline(false);
-    window.addEventListener('online', up);
-    window.addEventListener('offline', down);
-    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
-  }, []);
-
+  // El indicador de "sin conexión" ahora es global (OfflineBanner en Layout)
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -53,6 +45,10 @@ export default function Dashboard() {
   const [enabledContributorIds, setEnabledContributorIds] = useState<Set<string>>(new Set());
   const [contributorFilterReady, setContributorFilterReady] = useState(false);
   const [contributionMonths, setContributionMonths] = useState<6 | 12 | 24>(6);
+
+  // El atrás del sistema cierra los modales de filtros
+  useModalHistory(showCategoryFilter, () => setShowCategoryFilter(false));
+  useModalHistory(showFilterModal, () => setShowFilterModal(false));
 
   useEffect(() => {
     if (projects.length > 0 && selectedProjects.length === 0) {
@@ -156,7 +152,9 @@ export default function Dashboard() {
         .filter(t => isWithinInterval(t.date, { start, end }))
         .reduce((s, t) => s + t.amount, 0);
       return { period: format(start, timePeriod === 'weekly' ? 'dd MMM' : 'MMM', { locale: es }), total };
-    }).filter(d => d.total > 0).slice(-6);
+      // Se conservan los períodos en cero: omitirlos deformaba la tendencia
+      // (la gráfica saltaba meses sin gasto en silencio)
+    }).slice(-6);
   }, [filteredExpenses, timePeriod]);
 
   const allCategoryData = useMemo(() => {
@@ -301,14 +299,8 @@ export default function Dashboard() {
           headerHidden ? '-translate-y-full' : 'translate-y-0',
         )}
       >
-        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Inicio</h1>
         <div className="flex items-center gap-2">
-          {!isOnline && (
-            <span className="flex items-center gap-1.5 text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-semibold">
-              <WifiOff className="w-3 h-3" />
-              Sin conexión
-            </span>
-          )}
           <NotificationButton />
         </div>
       </header>
@@ -371,8 +363,8 @@ export default function Dashboard() {
               <Calendar className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mes anterior</span>
             </div>
-            <p className="text-xl font-bold text-gray-400 mb-1">{formatCurrency(prevMonthExpenses)}</p>
-            <p className="text-xs text-gray-400">
+            <p className="text-xl font-bold text-gray-700 mb-1">{formatCurrency(prevMonthExpenses)}</p>
+            <p className="text-xs text-gray-500">
               {format(subMonths(now, 1), 'MMMM yyyy', { locale: es })}
             </p>
           </div>
@@ -411,7 +403,7 @@ export default function Dashboard() {
                         <Building2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{stage.name}</p>
-                          <p className="text-[10px] text-gray-400">{projectName}</p>
+                          <p className="text-[11px] text-gray-500">{projectName}</p>
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0 ml-2">
@@ -471,14 +463,15 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-800 text-sm">Gráfico de Gastos</h3>
-                    <p className="text-[10px] text-gray-400 font-medium">
-                      {timePeriod === 'weekly' ? 'Vista Semanal' : 'Vista Mensual'}
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      {timePeriod === 'weekly' ? 'Últimas 6 semanas' : 'Últimos 6 meses'}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowFilterModal(true)}
-                  className="p-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
+                  aria-label="Configurar gráfico de gastos"
+                  className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
                 >
                   <Filter className="w-4 h-4" />
                   {hasActiveFilters && (
@@ -537,7 +530,8 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setShowCategoryFilter(true)}
-                  className="p-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
+                  aria-label="Filtrar categorías"
+                  className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
                 >
                   <Filter className="w-4 h-4" />
                   {hasCategoryActiveFilters && (
@@ -617,14 +611,14 @@ export default function Dashboard() {
                           <p className={cn('text-sm font-bold', user.isCurrentUser ? 'text-blue-900' : 'text-gray-800')}>
                             {user.name} {user.isCurrentUser && '(Tú)'}
                           </p>
-                          <p className="text-[10px] text-gray-500">{formatCurrency(user.contributed)} / {formatCurrency(user.expected)}</p>
+                          <p className="text-[11px] text-gray-500 tabular-nums">{formatCurrency(user.contributed)} / {formatCurrency(user.expected)}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className={cn('text-lg font-bold', user.percentage >= 100 ? 'text-emerald-600' : user.percentage >= 50 ? 'text-blue-600' : 'text-amber-600')}>
                           {user.percentage.toFixed(0)}%
                         </p>
-                        {user.remaining > 0 && <p className="text-[10px] text-gray-500">Falta: {formatCurrency(user.remaining)}</p>}
+                        {user.remaining > 0 && <p className="text-[11px] text-gray-500 tabular-nums">Falta: {formatCurrency(user.remaining)}</p>}
                       </div>
                     </div>
                     <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
@@ -771,7 +765,7 @@ export default function Dashboard() {
                       />
                       <Tooltip
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                        formatter={(value) => [formatCurrency(Number(value ?? 0)), '']}
+                        formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name]}
                         labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
                       />
                       {contributionLineData.contributors.map((c, i) => {
@@ -833,10 +827,10 @@ export default function Dashboard() {
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <p className="text-[10px] text-gray-400">{pct.toFixed(0)}% de {formatCurrency(stat.budget)}</p>
+                      <p className="text-[11px] text-gray-500 tabular-nums">{pct.toFixed(0)}% de {formatCurrency(stat.budget)}</p>
                     </>
                   ) : (
-                    <p className="text-[10px] text-gray-400">{stat.transactionCount} movimientos</p>
+                    <p className="text-[11px] text-gray-500">{stat.transactionCount} movimientos</p>
                   )}
                 </button>
               );
@@ -916,6 +910,7 @@ export default function Dashboard() {
         )}
         <button
           onClick={() => setIsFabOpen(!isFabOpen)}
+          aria-label={isFabOpen ? 'Cerrar menú de registro' : 'Registrar aporte o gasto'}
           className={cn('w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 bg-gray-900 text-white', isFabOpen && 'rotate-45')}
         >
           <Plus className="w-7 h-7" />
@@ -924,13 +919,13 @@ export default function Dashboard() {
 
       {/* MODAL FILTRO CATEGORÍAS */}
       {showCategoryFilter && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowCategoryFilter(false)} />
           <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">Filtrar Categorías</h2>
-              <button onClick={() => setShowCategoryFilter(false)} className="p-1 rounded-full hover:bg-gray-100">
+              <button onClick={() => setShowCategoryFilter(false)} aria-label="Cerrar filtro" className="p-2 rounded-full hover:bg-gray-100">
                 <X className="w-6 h-6 text-gray-400" />
               </button>
             </div>
@@ -955,8 +950,8 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos</label>
-                  <button onClick={toggleAllCategoryProjects} className="text-xs font-medium text-purple-600">
-                    {selectedCategoryProjects.length === projects.length ? 'Ocultar todos' : 'Ver todos'}
+                  <button onClick={toggleAllCategoryProjects} className="text-xs font-medium text-purple-600 py-1.5 px-2 -mr-2 rounded-lg hover:bg-purple-50">
+                    {selectedCategoryProjects.length === projects.length ? 'Quitar todos' : 'Seleccionar todos'}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -984,13 +979,13 @@ export default function Dashboard() {
 
       {/* MODAL FILTROS */}
       {showFilterModal && (
-        <div className="fixed inset-0 bottom-20 sm:bottom-0 z-50 flex items-end sm:items-center justify-center">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowFilterModal(false)} />
           <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">Configurar Gráfico</h2>
-              <button onClick={() => setShowFilterModal(false)} className="p-1 rounded-full hover:bg-gray-100">
+              <button onClick={() => setShowFilterModal(false)} aria-label="Cerrar configuración" className="p-2 rounded-full hover:bg-gray-100">
                 <X className="w-6 h-6 text-gray-400" />
               </button>
             </div>
@@ -1008,8 +1003,8 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos Incluidos</label>
-                  <button onClick={toggleAllProjects} className="text-xs font-medium text-blue-600">
-                    {selectedProjects.length === projects.length ? 'Ocultar todos' : 'Ver todos'}
+                  <button onClick={toggleAllProjects} className="text-xs font-medium text-blue-600 py-1.5 px-2 -mr-2 rounded-lg hover:bg-blue-50">
+                    {selectedProjects.length === projects.length ? 'Quitar todos' : 'Seleccionar todos'}
                   </button>
                 </div>
                 <div className="space-y-2">

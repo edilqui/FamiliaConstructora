@@ -127,6 +127,18 @@ export interface Activity {
   completedAt?: Date;
 }
 
+// --- ARQUEO DE CAJA ---
+export interface CashCount {
+  id: string;
+  countedAmount: number; // Efectivo contado físicamente
+  expectedAmount: number; // Saldo teórico de caja al momento del conteo
+  difference: number; // countedAmount - expectedAmount (0 = cuadró)
+  countedBy: string; // userId de quien contó
+  countedByName: string;
+  notes?: string;
+  createdAt: Date;
+}
+
 // --- TAREAS / NOTAS ---
 export interface Task {
   id: string;

@@ -1,20 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import {
-  Scale, TrendingUp, TrendingDown, User,
+  Scale, TrendingUp, TrendingDown,
   DollarSign, AlertCircle, CheckCircle2,
-  Wallet, History
+  Wallet, History, ClipboardCheck, Loader2, X
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
+import { useModalHistory } from '../hooks/useModalHistory';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
 import NotificationButton from '../components/NotificationButton';
+import AmountInput from '../components/AmountInput';
+import { addCashCount, subscribeCashCounts } from '../services/cashCountService';
+import { toast } from '../store/useToastStore';
+import type { CashCount } from '../types';
 
 export default function Balance() {
-  const { userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount } = useDashboardData();
+  const { userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
   const user = useAuthStore((state) => state.user);
 
   // Verificar si el usuario actual es colaborador
@@ -31,6 +36,43 @@ export default function Balance() {
   const handleCloseForm = () => {
     setShowContributionForm(false);
     setTransactionToEdit(undefined);
+  };
+
+  // --- ARQUEO DE CAJA (conteo físico vs saldo teórico) ---
+  const [cashCounts, setCashCounts] = useState<CashCount[]>([]);
+  const [showCashCount, setShowCashCount] = useState(false);
+  const [countedAmount, setCountedAmount] = useState('');
+  const [savingCount, setSavingCount] = useState(false);
+
+  useEffect(() => subscribeCashCounts(setCashCounts), []);
+  useModalHistory(showCashCount, () => setShowCashCount(false));
+
+  const lastCashCount = cashCounts[0];
+  const countedValue = countedAmount ? parseFloat(countedAmount) : NaN;
+  const liveDifference = isNaN(countedValue) ? null : countedValue - totalInBox;
+
+  const handleSaveCashCount = async () => {
+    if (!user || isNaN(countedValue)) return;
+    setSavingCount(true);
+    try {
+      await addCashCount({
+        countedAmount: countedValue,
+        expectedAmount: totalInBox,
+        countedBy: user.id,
+        countedByName: user.name,
+      });
+      toast(
+        countedValue === totalInBox
+          ? 'Arqueo registrado: la caja cuadró'
+          : `Arqueo registrado con descuadre de ${formatCurrency(countedValue - totalInBox)}`
+      );
+      setShowCashCount(false);
+      setCountedAmount('');
+    } catch {
+      toast('No se pudo guardar el arqueo. Intenta de nuevo.', { type: 'error' });
+    } finally {
+      setSavingCount(false);
+    }
   };
 
   // --- LÓGICA ORIGINAL (INTACTA) ---
@@ -86,19 +128,32 @@ export default function Balance() {
     return Math.min(100, (currentUserStats.totalContributed / expectedContribution) * 100);
   }, [currentUserStats, expectedContribution]);
 
-  const recommendedContribution = useMemo(() => {
-    if (amountToCatchUp === 0) return 0;
-    return Math.max(amountToCatchUp, totalInBox * 0.25);
-  }, [amountToCatchUp, totalInBox]);
+  // Sugerencia = lo que debe para quedar al día (antes sumaba un 25% de caja
+  // hardcodeado que no correspondía al número real de miembros)
+  const recommendedContribution = amountToCatchUp;
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
-  if (!currentUserStats || !user) {
+  // Mientras cargan los datos: spinner. Si ya cargaron y aun así no hay stats
+  // del usuario, mostramos un estado claro en vez de una espera infinita.
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-12 w-12 bg-gray-200 rounded-full mb-4"></div>
-          <p className="text-gray-400 text-sm font-medium">Sincronizando finanzas...</p>
+          <p className="text-gray-500 text-sm font-medium">Sincronizando finanzas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUserStats) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50 px-8 text-center">
+        <div>
+          <Scale className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-600 text-sm font-medium">Aún no hay datos de tu cuenta.</p>
+          <p className="text-gray-500 text-xs mt-1">Registra tu primer aporte o gasto para ver tu balance.</p>
         </div>
       </div>
     );
@@ -176,7 +231,9 @@ export default function Balance() {
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.totalContributed)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider opacity-70">Tu Cuota (25%)</p>
+                <p className="text-[10px] uppercase tracking-wider opacity-70">
+                  Tu Cuota (1/{memberCount || 4})
+                </p>
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.share)}</p>
               </div>
             </div>
@@ -256,12 +313,15 @@ export default function Balance() {
               <DollarSign className="w-6 h-6 text-amber-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-gray-800 text-sm">Sugerencia de Pago</h3>
-              <p className="text-xs text-gray-500 mt-0.5 mb-1">Cubre tu deuda + el 25% de caja</p>
+              <h3 className="font-bold text-gray-800 text-sm">Sugerencia de Aporte</h3>
+              <p className="text-xs text-gray-500 mt-0.5 mb-1">Para ponerte al día con el grupo</p>
               <p className="text-lg font-bold text-amber-700">{formatCurrency(recommendedContribution)}</p>
             </div>
-            <button className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform">
-              Pagar
+            <button
+              onClick={() => { setTransactionToEdit(undefined); setShowContributionForm(true); }}
+              className="bg-amber-500 text-white px-4 py-3 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform"
+            >
+              Aportar
             </button>
           </div>
         )}
@@ -286,6 +346,52 @@ export default function Balance() {
             </div>
             <p className="text-xl font-bold text-gray-900">{formatCurrency(totalExpenses)}</p>
           </div>
+        </div>
+
+        {/* --- ARQUEO DE CAJA --- */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-teal-50 rounded-lg">
+                <ClipboardCheck className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800">Arqueo de Caja</h3>
+                <p className="text-xs text-gray-500">¿El efectivo físico coincide con la app?</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setCountedAmount(''); setShowCashCount(true); }}
+              className="bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform flex-shrink-0"
+            >
+              Contar caja
+            </button>
+          </div>
+
+          {lastCashCount ? (
+            <div className={cn(
+              'rounded-xl p-3 border flex items-center justify-between gap-3',
+              lastCashCount.difference === 0
+                ? 'bg-emerald-50 border-emerald-100'
+                : 'bg-amber-50 border-amber-100'
+            )}>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-gray-700">
+                  {lastCashCount.difference === 0 ? 'La caja cuadró' : `Descuadre: ${formatCurrency(lastCashCount.difference)}`}
+                </p>
+                <p className="text-[11px] text-gray-500 truncate">
+                  {lastCashCount.countedByName} contó {formatCurrency(lastCashCount.countedAmount)} · {format(lastCashCount.createdAt, "d MMM, HH:mm", { locale: es })}
+                </p>
+              </div>
+              {lastCashCount.difference === 0
+                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                : <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-xl p-3">
+              Aún no se ha hecho ningún arqueo. Cuenten el efectivo y regístrenlo para verificar que la caja cuadre.
+            </p>
+          )}
         </div>
 
         {/* --- LISTA DE MIEMBROS (Solo los que dividen gastos) --- */}
@@ -324,7 +430,7 @@ export default function Balance() {
                       <p className={cn("text-sm font-semibold", isCurrentUser ? "text-blue-900" : "text-gray-900")}>
                         {stats.userName} {isCurrentUser && '(Tú)'}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         Aportado: {formatCurrency(stats.totalContributed)}
                       </p>
                     </div>
@@ -338,7 +444,7 @@ export default function Balance() {
                       {userIsInDebt ? '-' : '+'}{formatCurrency(Math.abs(stats.balance))}
                     </span>
                     <span className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
+                      "text-[11px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
                       userIsInDebt ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
                     )}>
                       {userIsInDebt ? 'Debe' : 'A favor'}
@@ -477,6 +583,102 @@ export default function Balance() {
           onClose={handleCloseForm}
           transactionToEdit={transactionToEdit}
         />
+      )}
+
+      {/* --- BOTTOM SHEET: REGISTRAR ARQUEO --- */}
+      {showCashCount && (
+        <div role="dialog" aria-modal="true" aria-label="Registrar arqueo de caja" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setShowCashCount(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 text-teal-600 rounded-full">
+                  <ClipboardCheck className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Arqueo de Caja</h2>
+              </div>
+              <button onClick={() => setShowCashCount(false)} aria-label="Cerrar arqueo" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm text-blue-800 font-medium">Saldo según la app</span>
+                <span className="text-lg font-bold text-blue-900 tabular-nums">{formatCurrency(totalInBox)}</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
+                  ¿Cuánto efectivo contaron?
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
+                  <AmountInput
+                    value={countedAmount}
+                    onChange={setCountedAmount}
+                    placeholder="0"
+                    aria-label="Efectivo contado"
+                    autoFocus
+                    className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-teal-50/50 border-2 border-transparent focus:border-teal-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
+                  />
+                </div>
+              </div>
+
+              {liveDifference !== null && (
+                <div className={cn(
+                  'rounded-xl p-3 flex items-center gap-3 border',
+                  liveDifference === 0
+                    ? 'bg-emerald-50 border-emerald-100'
+                    : 'bg-amber-50 border-amber-100'
+                )}>
+                  {liveDifference === 0
+                    ? <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    : <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />}
+                  <p className="text-sm font-medium text-gray-700">
+                    {liveDifference === 0
+                      ? '¡La caja cuadra exacto!'
+                      : liveDifference > 0
+                        ? <>Sobran <b>{formatCurrency(liveDifference)}</b> respecto a la app</>
+                        : <>Faltan <b>{formatCurrency(Math.abs(liveDifference))}</b> respecto a la app</>}
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleSaveCashCount}
+                disabled={savingCount || isNaN(countedValue)}
+                className="w-full py-4 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingCount ? <Loader2 className="w-5 h-5 animate-spin" /> : <ClipboardCheck className="w-5 h-5" />}
+                Registrar arqueo
+              </button>
+
+              {cashCounts.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Arqueos anteriores</p>
+                  <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+                    {cashCounts.slice(0, 5).map((c) => (
+                      <div key={c.id} className="flex items-center justify-between px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-gray-700 truncate">{c.countedByName}</p>
+                          <p className="text-[11px] text-gray-500">{format(c.createdAt, "d MMM yyyy, HH:mm", { locale: es })}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-gray-800 tabular-nums">{formatCurrency(c.countedAmount)}</p>
+                          <p className={cn('text-[11px] font-semibold', c.difference === 0 ? 'text-emerald-600' : 'text-amber-600')}>
+                            {c.difference === 0 ? 'Cuadró' : `${c.difference > 0 ? '+' : ''}${formatCurrency(c.difference)}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

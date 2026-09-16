@@ -6,6 +6,9 @@ import { addTransaction, updateTransaction, deleteTransaction } from '../service
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
+import AmountInput from '../components/AmountInput';
+import { useModalHistory } from '../hooks/useModalHistory';
+import { toast } from '../store/useToastStore';
 
 interface ContributionFormProps {
   onClose: () => void;
@@ -32,11 +35,15 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
 
+  // El atrás del sistema cierra el formulario (y primero la confirmación de borrado)
+  useModalHistory(true, onClose);
+  useModalHistory(showDeleteConfirm, () => setShowDeleteConfirm(false));
+
   // Cargar datos en edición
   useEffect(() => {
     if (transactionToEdit) {
       setUserId(transactionToEdit.userId);
-      setAmount(transactionToEdit.amount.toString());
+      setAmount(String(Math.round(transactionToEdit.amount)));
       setDescription(transactionToEdit.description);
       setNotes(transactionToEdit.notes || '');
       setDate(format(transactionToEdit.date, 'yyyy-MM-dd'));
@@ -48,12 +55,33 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
     if (!transactionToEdit || !currentUser) return;
     setLoading(true);
     try {
+      const deleted = transactionToEdit; // Copia para poder deshacer
       await deleteTransaction({
-        id: transactionToEdit.id,
+        id: deleted.id,
         deletedBy: currentUser.id,
         deletedByName: currentUser.name,
-        description: transactionToEdit.description,
+        description: deleted.description,
         projectName: 'Aporte'
+      });
+      toast('Aporte eliminado', {
+        actionLabel: 'Deshacer',
+        onAction: () => {
+          addTransaction({
+            amount: deleted.amount,
+            project: deleted.project,
+            type: deleted.type,
+            projectId: deleted.projectId,
+            categoryId: deleted.categoryId,
+            categoryName: deleted.categoryName,
+            userId: deleted.userId,
+            registeredBy: currentUser.id,
+            registeredByName: currentUser.name,
+            description: deleted.description,
+            notes: deleted.notes,
+            date: deleted.date,
+          }).then(() => toast('Aporte restaurado'))
+            .catch(() => toast('No se pudo restaurar el aporte', { type: 'error' }));
+        },
       });
       onClose();
     } catch (err) {
@@ -83,6 +111,11 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
       const [year, month, day] = date.split('-').map(Number);
       const [hours, minutes] = time.split(':').map(Number);
       const transactionDate = new Date(year, month - 1, day, hours, minutes);
+
+      if (transactionDate.getTime() > Date.now()) {
+        setLoading(false);
+        return setError('La fecha y hora no pueden ser futuras');
+      }
 
       if (isEditMode && transactionToEdit) {
         await updateTransaction({
@@ -116,6 +149,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           date: transactionDate,
         });
       }
+      toast(isEditMode ? 'Cambios guardados' : 'Aporte registrado');
       onClose();
     } catch (err) {
       setError('Error al guardar. Intenta nuevamente.');
@@ -125,7 +159,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   };
 
   return (
-    <div className="fixed bottom-20 inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
@@ -145,7 +179,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               {isEditMode ? 'Editar Aporte' : 'Nuevo Aporte'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Cerrar formulario" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
@@ -166,12 +200,11 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             <div className="relative flex gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-light text-gray-400">$</span>
-                <input
-                  type="number"
-                  step="0.01"
+                <AmountInput
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
+                  onChange={setAmount}
+                  placeholder="0"
+                  aria-label="Monto del aporte"
                   className="w-full pl-10 pr-4 py-4 text-4xl font-bold text-gray-900 bg-emerald-50/50 border-2 border-transparent focus:border-emerald-500 rounded-2xl focus:bg-white focus:outline-none transition-all placeholder:text-gray-300"
                   required
                   autoFocus={!isEditMode}
@@ -180,6 +213,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               <button
                 type="button"
                 onClick={() => setShowCalculator(true)}
+                aria-label="Abrir calculadora"
                 className="flex-shrink-0 w-16 h-16 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl flex items-center justify-center transition-colors active:scale-95"
                 title="Abrir calculadora"
               >
@@ -212,7 +246,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
                 className="w-full appearance-none pl-10 pr-8 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
                 required
               >
-                <option value="">Seleccionar hermano...</option>
+                <option value="">Seleccionar miembro...</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name} {u.id === currentUser?.id ? '(Yo)' : ''}
@@ -314,19 +348,22 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               </div>
               <h3 className="text-xl font-bold text-gray-900">¿Eliminar aporte?</h3>
               <p className="text-sm text-gray-500">
-                Se reducirá el dinero en caja y se ajustará el balance del hermano. Esta acción no se puede deshacer.
+                Se reducirá el dinero en caja y se ajustará el balance de quien aportó. Tendrás unos segundos para deshacer.
               </p>
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
+                  disabled={loading}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200"
+                  disabled={loading}
+                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Sí, eliminar
                 </button>
               </div>
@@ -340,7 +377,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
         <CalculatorComponent
           onClose={() => setShowCalculator(false)}
           onConfirm={(value) => {
-            setAmount(value);
+            setAmount(String(Math.max(0, Math.round(parseFloat(value) || 0))));
             setShowCalculator(false);
           }}
           initialValue={amount}
