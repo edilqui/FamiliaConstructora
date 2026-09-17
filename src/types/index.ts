@@ -47,6 +47,7 @@ export interface Transaction {
   activityName?: string | null; // Nombre de la actividad (para mostrar)
   stageId?: string | null; // ID de etapa de obra (opcional)
   stageName?: string | null; // Nombre de la etapa (para mostrar)
+  hasReceipt?: boolean; // true si hay foto de recibo en receipts/{id}
   createdAt: Date;
 }
 

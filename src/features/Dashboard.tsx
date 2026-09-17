@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, formatShort, cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import {
   Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown,
@@ -70,12 +70,6 @@ export default function Dashboard() {
   }, [memberStats, contributorFilterReady]);
 
   const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
-
-  const formatShort = (value: number) => {
-    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-    return `$${value.toFixed(0)}`;
-  };
 
   // ── Gasto del mes actual y anterior ──────────────────────────────────────
   const now = new Date();
@@ -390,6 +384,7 @@ export default function Dashboard() {
                 const completedActs = stageActs.filter(a => a.status === 'completed').length;
                 const pct = stage.estimatedBudget > 0 ? Math.min((spent / stage.estimatedBudget) * 100, 100) : 0;
                 const overBudget = stage.estimatedBudget > 0 && spent > stage.estimatedBudget;
+                const nearBudget = stage.estimatedBudget > 0 && !overBudget && spent / stage.estimatedBudget >= 0.8;
                 const projectName = projects.find(p => p.id === stage.projectId)?.name ?? '';
 
                 return (
@@ -421,13 +416,15 @@ export default function Dashboard() {
                     </div>
                     <div className="w-full bg-orange-100 rounded-full h-1.5 mb-1.5">
                       <div
-                        className={cn('h-1.5 rounded-full transition-all', overBudget ? 'bg-red-500' : 'bg-orange-500')}
+                        className={cn('h-1.5 rounded-full transition-all', overBudget ? 'bg-red-500' : nearBudget ? 'bg-amber-500' : 'bg-orange-500')}
                         style={{ width: stage.estimatedBudget > 0 ? `${pct}%` : '0%' }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-500">
-                      <span className={cn('font-medium', overBudget && 'text-red-600')}>
-                        {formatCurrency(spent)} gastado{overBudget && ' ⚠'}
+                      <span className={cn('font-medium', overBudget && 'text-red-600', nearBudget && 'text-amber-600')}>
+                        {formatCurrency(spent)} gastado
+                        {overBudget && ' · presupuesto excedido'}
+                        {nearBudget && ' · cerca del límite'}
                       </span>
                       <span>
                         {stage.estimatedBudget > 0

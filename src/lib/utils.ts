@@ -20,3 +20,10 @@ export function formatDate(date: Date): string {
     day: 'numeric',
   }).format(date);
 }
+
+/** Formato corto para ejes y etiquetas de gráficas: $1.2M, $350K */
+export function formatShort(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}

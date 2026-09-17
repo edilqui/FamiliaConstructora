@@ -318,6 +318,7 @@ export default function ConstructionManager() {
     const stageSpent = spentByStage.get(stage.id) ?? 0;
     const isExpanded = expandedStageIds.has(stage.id);
     const overBudget = stage.estimatedBudget > 0 && stageSpent > stage.estimatedBudget;
+    const nearBudget = stage.estimatedBudget > 0 && !overBudget && stageSpent / stage.estimatedBudget >= 0.8;
 
     return (
       <div key={stage.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -342,15 +343,14 @@ export default function ConstructionManager() {
           <div className="mt-3 space-y-1.5">
             <div className="flex justify-between text-xs text-gray-500">
               <span>Presupuesto: <span className="font-semibold text-gray-700">{formatCurrency(stage.estimatedBudget)}</span></span>
-              <span className={cn('font-semibold', overBudget ? 'text-red-600' : 'text-gray-700')}>
+              <span className={cn('font-semibold', overBudget ? 'text-red-600' : nearBudget ? 'text-amber-600' : 'text-gray-700')}>
                 Gastado: {formatCurrency(stageSpent)}
-                {overBudget && ' ⚠'}
               </span>
             </div>
-            <ProgressBar value={stageSpent} max={stage.estimatedBudget} />
-            <div className="text-right text-xs text-gray-400">
+            <ProgressBar value={stageSpent} max={stage.estimatedBudget} color={nearBudget ? 'bg-amber-500' : 'bg-orange-500'} />
+            <div className={cn('text-right text-xs', overBudget ? 'text-red-600 font-semibold' : nearBudget ? 'text-amber-600 font-semibold' : 'text-gray-500')}>
               {stage.estimatedBudget > 0
-                ? `${Math.round((stageSpent / stage.estimatedBudget) * 100)}% del presupuesto`
+                ? `${Math.round((stageSpent / stage.estimatedBudget) * 100)}% del presupuesto${overBudget ? ' · excedido' : nearBudget ? ' · cerca del límite' : ''}`
                 : 'Sin presupuesto definido'}
             </div>
           </div>

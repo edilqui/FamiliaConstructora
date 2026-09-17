@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
-import { formatCurrency, formatDate } from '../lib/utils';
+import { formatCurrency, formatDate, formatShort } from '../lib/utils';
 import {
   Loader2, TrendingUp, TrendingDown, Wallet,
-  Users, Briefcase, Activity, BarChart3, Tag
+  Users, Briefcase, Activity, BarChart3, Tag, Share2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import CategoryReport from './CategoryReport';
 import NotificationButton from '../components/NotificationButton';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type TabType = 'statistics' | 'categories';
 
@@ -25,6 +30,50 @@ export default function Statistics() {
   const recentTransactions = [...transactions]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 5);
+
+  // Aportes vs gastos de los últimos 6 meses (incluye meses en cero)
+  const monthlyData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthDate = subMonths(now, 5 - i);
+      const start = startOfMonth(monthDate);
+      const end = endOfMonth(monthDate);
+      const inMonth = transactions.filter(t => t.date >= start && t.date <= end);
+      return {
+        month: format(monthDate, 'MMM', { locale: es }),
+        Aportes: inMonth.filter(t => t.type === 'contribution').reduce((s, t) => s + t.amount, 0),
+        Gastos: inMonth.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+      };
+    });
+  }, [transactions]);
+
+  // Resumen del mes actual, compartible por WhatsApp o el share nativo
+  const handleShareSummary = async () => {
+    const now = new Date();
+    const start = startOfMonth(now);
+    const monthTx = transactions.filter(t => t.date >= start);
+    const aportes = monthTx.filter(t => t.type === 'contribution').reduce((s, t) => s + t.amount, 0);
+    const gastos = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+    const text = [
+      `📊 FamiliaBuilder — Resumen de ${format(now, 'MMMM yyyy', { locale: es })}`,
+      '',
+      `🟢 Aportes del mes: ${formatCurrency(aportes)}`,
+      `🔴 Gastos del mes: ${formatCurrency(gastos)}`,
+      `💰 En caja: ${formatCurrency(totalInBox)}`,
+      '',
+      'Balance por miembro:',
+      ...memberStats.map(s =>
+        `• ${s.userName}: ${s.balance >= 0 ? 'a favor' : 'debe'} ${formatCurrency(Math.abs(s.balance))}`
+      ),
+    ].join('\n');
+
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch { /* usuario canceló */ }
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8 font-sans">
@@ -43,7 +92,16 @@ export default function Statistics() {
             <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Reportes</h1>
             <p className="text-xs lg:text-sm text-gray-500">Análisis y estadísticas financieras</p>
           </div>
-          <NotificationButton />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleShareSummary}
+              aria-label="Compartir resumen del mes"
+              className="p-2.5 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+            <NotificationButton />
+          </div>
         </div>
 
         {/* Tabs */}
@@ -137,6 +195,42 @@ export default function Statistics() {
                 <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
                   <Wallet className="w-6 h-6 text-white" />
                 </div>
+              </div>
+            </div>
+
+            {/* --- GRÁFICA: APORTES VS GASTOS POR MES --- */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-sm">Aportes vs Gastos</h3>
+                    <p className="text-[11px] text-gray-500 font-medium">Últimos 6 meses</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] font-medium text-gray-600">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Aportes</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400" /> Gastos</span>
+                </div>
+              </div>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} dy={8} />
+                    <YAxis tickFormatter={formatShort} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={44} />
+                    <Tooltip
+                      cursor={{ fill: '#f3f4f6', radius: 8 }}
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                      formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name]}
+                      labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
+                    />
+                    <Bar dataKey="Aportes" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="Gastos" fill="#f87171" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
 

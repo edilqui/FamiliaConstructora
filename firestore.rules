@@ -64,6 +64,13 @@ service cloud.firestore {
       allow update, delete: if request.auth != null;
     }
 
+    // Recibos - foto comprimida asociada a una transacción (doc id = transactionId)
+    match /receipts/{transactionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
     // Arqueos de caja - conteo físico vs saldo teórico, visible para todos
     match /cashCounts/{countId} {
       allow read: if request.auth != null;

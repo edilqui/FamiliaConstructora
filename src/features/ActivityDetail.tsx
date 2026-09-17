@@ -5,19 +5,13 @@ import { useConstructionData } from '../hooks/useConstructionData';
 import {
   ArrowLeft, HardHat, Tag, ArrowDownCircle, Receipt, Loader2,
 } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, formatShort } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
-
-const formatShort = (v: number) => {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v.toFixed(0)}`;
-};
 
 export default function ActivityDetail() {
   const { activityId } = useParams<{ activityId: string }>();

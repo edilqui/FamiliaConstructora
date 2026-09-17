@@ -2,6 +2,7 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, deleteF
 import { db } from '../config/firebase';
 import { TransactionType } from '../types';
 import { createNotification } from './notificationService';
+import { deleteReceipt } from './receiptService';
 
 interface AddTransactionParams {
   amount: number;
@@ -24,7 +25,8 @@ interface AddTransactionParams {
   stageName?: string | null;
 }
 
-export const addTransaction = async (params: AddTransactionParams): Promise<void> => {
+// Devuelve el id del documento creado (necesario para asociarle un recibo)
+export const addTransaction = async (params: AddTransactionParams): Promise<string> => {
   const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, registeredByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
 
   try {
@@ -87,10 +89,18 @@ export const addTransaction = async (params: AddTransactionParams): Promise<void
     }
 
     console.log('Transacción agregada exitosamente');
+    return docRef.id;
   } catch (error) {
     console.error('Error al agregar transacción:', error);
     throw error;
   }
+};
+
+/** Marca (o desmarca) que una transacción tiene foto de recibo asociada */
+export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean): Promise<void> => {
+  await updateDoc(doc(db, 'transactions', id), {
+    hasReceipt: hasReceipt ? true : deleteField(),
+  });
 };
 
 interface UpdateTransactionParams {
@@ -217,6 +227,13 @@ export const deleteTransaction = async (params: DeleteTransactionParams): Promis
   try {
     const transactionRef = doc(db, 'transactions', id);
     await deleteDoc(transactionRef);
+
+    // Borrar la foto del recibo asociada (si existe); no es fatal si falla
+    try {
+      await deleteReceipt(id);
+    } catch (receiptError) {
+      console.error('Transacción eliminada, pero falló el borrado del recibo:', receiptError);
+    }
 
     // Notificación secundaria: no debe convertir una eliminación exitosa en "error"
     try {

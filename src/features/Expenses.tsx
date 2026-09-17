@@ -5,7 +5,9 @@ import { useAuthStore } from '../store/useAuthStore';
 import {
   Search, Filter, Plus, Minus, ArrowUpCircle, ArrowDownCircle,
   Trash2, Wallet, ArrowLeft, MoreVertical, Check, Tag, HardHat, X,
+  Download, Paperclip,
 } from 'lucide-react';
+import { buildTransactionsCsv, downloadCsv } from '../lib/exportCsv';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { useModalHistory } from '../hooks/useModalHistory';
@@ -43,6 +45,8 @@ export default function Expenses() {
   const [filterType, setFilterType] = useState<'all' | 'contribution' | 'expense'>('all');
   const [filterProject, setFilterProject] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -178,10 +182,18 @@ export default function Expenses() {
     if (filterType !== 'all') filtered = filtered.filter(t => t.type === filterType);
     if (filterProject !== 'all') filtered = filtered.filter(t => t.projectId === filterProject);
     if (filterCategory !== 'all') filtered = filtered.filter(t => t.categoryId === filterCategory);
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom + 'T00:00:00');
+      filtered = filtered.filter(t => t.date >= from);
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo + 'T23:59:59.999');
+      filtered = filtered.filter(t => t.date <= to);
+    }
     if (searchTerm) filtered = filtered.filter(t => t.description.toLowerCase().includes(searchTerm.toLowerCase()));
     filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
     return filtered;
-  }, [transactions, filterType, filterProject, filterCategory, searchTerm]);
+  }, [transactions, filterType, filterProject, filterCategory, filterDateFrom, filterDateTo, searchTerm]);
 
   const filteredStats = useMemo(() => ({
     contributions: filteredTransactions.filter(t => t.type === 'contribution').reduce((s, t) => s + t.amount, 0),
@@ -193,7 +205,17 @@ export default function Expenses() {
     [filteredTransactions, selectedIds],
   );
 
-  const hasActiveFilters = filterType !== 'all' || filterProject !== 'all' || filterCategory !== 'all' || searchTerm !== '';
+  const hasActiveFilters = filterType !== 'all' || filterProject !== 'all' || filterCategory !== 'all' || searchTerm !== '' || filterDateFrom !== '' || filterDateTo !== '';
+
+  const handleExportCsv = () => {
+    if (filteredTransactions.length === 0) {
+      toast('No hay movimientos para exportar', { type: 'info' });
+      return;
+    }
+    const today = format(new Date(), 'yyyy-MM-dd');
+    downloadCsv(buildTransactionsCsv(filteredTransactions), `movimientos-${today}.csv`);
+    toast(`${filteredTransactions.length} movimientos exportados a CSV`);
+  };
   const allVisibleSelected = filteredTransactions.length > 0 && filteredTransactions.every(t => selectedIds.has(t.id));
 
   // Solo los gastos dentro de la selección son elegibles para cambios de categoría/actividad
@@ -353,8 +375,37 @@ export default function Expenses() {
                     )}
                   </select>
                 )}
+                {/* Rango de fechas */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-500 block mb-1 ml-1">Desde</label>
+                    <input
+                      type="date"
+                      value={filterDateFrom}
+                      max={filterDateTo || undefined}
+                      onChange={e => setFilterDateFrom(e.target.value)}
+                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-500 block mb-1 ml-1">Hasta</label>
+                    <input
+                      type="date"
+                      value={filterDateTo}
+                      min={filterDateFrom || undefined}
+                      onChange={e => setFilterDateTo(e.target.value)}
+                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleExportCsv}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg mb-1 hover:bg-emerald-100 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Exportar a Excel (CSV) · {filteredTransactions.length} mov.
+                </button>
                 {hasActiveFilters && (
-                  <button onClick={() => { setFilterType('all'); setFilterProject('all'); setFilterCategory('all'); setSearchTerm(''); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg mt-1">
+                  <button onClick={() => { setFilterType('all'); setFilterProject('all'); setFilterCategory('all'); setSearchTerm(''); setFilterDateFrom(''); setFilterDateTo(''); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg mt-1">
                     <Trash2 className="w-3 h-3" /> Limpiar todo
                   </button>
                 )}
@@ -468,7 +519,10 @@ export default function Expenses() {
 
                               {/* Descripción */}
                               <div className="flex-1 min-w-0 lg:flex-none">
-                                <p className="text-sm font-semibold text-gray-900 truncate">{t.description}</p>
+                                <p className="text-sm font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                                  <span className="truncate">{t.description}</span>
+                                  {t.hasReceipt && <Paperclip className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" aria-label="Tiene recibo adjunto" />}
+                                </p>
                                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5 lg:hidden">
                                   <span className="truncate max-w-[100px]">{t.project}</span>
                                   {isExpense && t.categoryName !== 'N/A' && (
