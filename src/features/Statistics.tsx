@@ -8,6 +8,7 @@ import {
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import CategoryReport from './CategoryReport';
+import AnalysisReport from './AnalysisReport';
 import NotificationButton from '../components/NotificationButton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,7 +16,7 @@ import {
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-type TabType = 'statistics' | 'categories';
+type TabType = 'statistics' | 'categories' | 'analysis';
 
 export default function Statistics() {
   const {
@@ -134,6 +135,22 @@ export default function Statistics() {
             <Tag className="w-4 h-4" />
             <span>Categorías</span>
             {activeTab === 'categories' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('analysis')}
+            className={cn(
+              "flex-1 py-3 px-4 text-sm font-semibold transition-colors relative flex items-center justify-center gap-2",
+              activeTab === 'analysis'
+                ? "text-blue-600 bg-blue-50/50"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            )}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Análisis</span>
+            {activeTab === 'analysis' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
             )}
           </button>
@@ -419,6 +436,9 @@ export default function Statistics() {
 
         {/* Tab: Categorías */}
         {!loading && activeTab === 'categories' && <CategoryReport />}
+
+        {/* Tab: Análisis (flujo de caja, estimado vs real, precios) */}
+        {!loading && activeTab === 'analysis' && <AnalysisReport />}
       </div>
     </div>
   );
