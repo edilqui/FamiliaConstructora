@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   Scale, TrendingUp, TrendingDown,
   DollarSign, AlertCircle, CheckCircle2,
-  Wallet, History, ClipboardCheck, Loader2, X
+  Wallet, History, ClipboardCheck, Loader2, X, ChevronRight
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -21,6 +22,7 @@ import type { CashCount } from '../types';
 export default function Balance() {
   const { userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
 
   // Verificar si el usuario actual es colaborador
   const isCollaborator = user?.role === 'collaborator';
@@ -80,13 +82,14 @@ export default function Balance() {
     return userStats.find((stats) => stats.userId === user?.id);
   }, [userStats, user]);
 
-  const userContributions = useMemo(() => {
+  const allUserContributions = useMemo(() => {
     if (!user) return [];
     return transactions
       .filter((t) => t.type === 'contribution' && t.userId === user.id)
-      .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 10);
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [transactions, user]);
+
+  const userContributions = allUserContributions.slice(0, 10);
 
   const amountToCatchUp = useMemo(() => {
     if (!currentUserStats) return 0;
@@ -410,10 +413,12 @@ export default function Balance() {
               const isLast = index === memberStats.length - 1;
 
               return (
-                <div
+                <button
                   key={stats.userId}
+                  onClick={() => navigate(`/user/${stats.userId}/contributions`)}
+                  aria-label={`Ver aportes de ${stats.userName}`}
                   className={cn(
-                    "flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
+                    "w-full text-left flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
                     !isLast && "border-b border-gray-50",
                     isCurrentUser && "bg-blue-50/30"
                   )}
@@ -436,21 +441,24 @@ export default function Balance() {
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <span className={cn(
-                      "text-sm font-bold block",
-                      userIsInDebt ? "text-red-500" : "text-emerald-600"
-                    )}>
-                      {userIsInDebt ? '-' : '+'}{formatCurrency(Math.abs(stats.balance))}
-                    </span>
-                    <span className={cn(
-                      "text-[11px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
-                      userIsInDebt ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
-                    )}>
-                      {userIsInDebt ? 'Debe' : 'A favor'}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span className={cn(
+                        "text-sm font-bold block",
+                        userIsInDebt ? "text-red-500" : "text-emerald-600"
+                      )}>
+                        {userIsInDebt ? '-' : '+'}{formatCurrency(Math.abs(stats.balance))}
+                      </span>
+                      <span className={cn(
+                        "text-[11px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
+                        userIsInDebt ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+                      )}>
+                        {userIsInDebt ? 'Debe' : 'A favor'}
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -472,10 +480,12 @@ export default function Balance() {
                 const isLast = index === collaboratorStats.length - 1;
 
                 return (
-                  <div
+                  <button
                     key={stats.userId}
+                    onClick={() => navigate(`/user/${stats.userId}/contributions`)}
+                    aria-label={`Ver aportes de ${stats.userName}`}
                     className={cn(
-                      "flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
+                      "w-full text-left flex items-center justify-between p-4 hover:bg-gray-50 transition-colors",
                       !isLast && "border-b border-gray-50",
                       isCurrentUser && "bg-purple-50/30"
                     )}
@@ -498,15 +508,18 @@ export default function Balance() {
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-sm font-bold block text-emerald-600">
-                        +{formatCurrency(stats.totalContributed)}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium bg-emerald-50 text-emerald-600">
-                        Aportado
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="text-sm font-bold block text-emerald-600">
+                          +{formatCurrency(stats.totalContributed)}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium bg-emerald-50 text-emerald-600">
+                          Aportado
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -515,15 +528,25 @@ export default function Balance() {
 
         {/* --- HISTORIAL (Compacto) --- */}
         <div>
-          <h3 className="font-bold text-gray-800 text-lg mb-3 px-1 flex items-center gap-2">
-            <History className="w-5 h-5 text-gray-400" />
-            Tus Movimientos
-          </h3>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+              <History className="w-5 h-5 text-gray-400" />
+              Tus Aportes
+            </h3>
+            {allUserContributions.length > 0 && (
+              <button
+                onClick={() => navigate(`/user/${user.id}/contributions`)}
+                className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 py-1.5"
+              >
+                Ver todos ({allUserContributions.length}) <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           <div className="space-y-3 lg:space-y-0">
             {userContributions.length === 0 ? (
               <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-200">
-                <p className="text-gray-400 text-sm">Sin movimientos recientes</p>
+                <p className="text-gray-400 text-sm">Aún no tienes aportes registrados</p>
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

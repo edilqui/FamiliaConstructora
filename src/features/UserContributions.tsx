@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Wallet,
   History,
+  Loader2,
   User
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
@@ -20,8 +21,9 @@ export default function UserContributions() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const goBack = useSmartBack('/');
-  const { users, userStats, transactions, projects, memberCount } = useDashboardData();
+  const { users, userStats, transactions, projects, memberCount, loading } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
+  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
@@ -88,6 +90,14 @@ export default function UserContributions() {
 
   const isCurrentUser = userId === currentUser?.id;
 
+  if (loading || users.length === 0) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   if (!targetUser || !targetUserStats) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -104,8 +114,6 @@ export default function UserContributions() {
       </div>
     );
   }
-
-  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8 font-sans">

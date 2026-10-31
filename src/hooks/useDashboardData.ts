@@ -18,7 +18,9 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
         ...doc.data(),
         id: doc.id,
       })) as User[];
-      setUsers(usersData);
+      // Los pendientes de aprobación no cuentan para cuotas, saldos ni listas.
+      // Sin el campo `approved` es un usuario antiguo, que se considera aprobado.
+      setUsers(usersData.filter((u) => u.approved !== false));
     });
 
     // Suscribirse a proyectos

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { formatCurrency, formatDate, formatShort } from '../lib/utils';
 import {
@@ -23,6 +24,7 @@ export default function Statistics() {
     memberStats, collaboratorStats, projectStats, transactions,
     totalInBox, totalContributions, totalExpenses, loading,
   } = useDashboardData();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
@@ -262,7 +264,12 @@ export default function Statistics() {
                 {memberStats.map((stat) => {
                   const isPositive = stat.balance >= 0;
                   return (
-                    <div key={stat.userId} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <button
+                      key={stat.userId}
+                      onClick={() => navigate(`/user/${stat.userId}/contributions`)}
+                      aria-label={`Ver aportes de ${stat.userName}`}
+                      className="w-full text-left p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    >
                       <div className="flex items-center gap-3">
                         {/* Avatar con iniciales */}
                         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border border-gray-200">
@@ -285,7 +292,7 @@ export default function Statistics() {
                           {isPositive ? 'A favor' : 'Debe'}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -302,7 +309,12 @@ export default function Statistics() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 overflow-hidden">
                   {collaboratorStats.map((stat) => {
                     return (
-                      <div key={stat.userId} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <button
+                        key={stat.userId}
+                        onClick={() => navigate(`/user/${stat.userId}/contributions`)}
+                        aria-label={`Ver aportes de ${stat.userName}`}
+                        className="w-full text-left p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                      >
                         <div className="flex items-center gap-3">
                           {/* Avatar con iniciales */}
                           <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold border border-purple-200">
@@ -322,7 +334,7 @@ export default function Statistics() {
                             Aportado
                           </p>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

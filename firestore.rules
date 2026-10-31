@@ -1,88 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Usuarios autenticados pueden leer todos los documentos
+    // Aprobado = tiene documento en users y no está marcado approved: false.
+    // Sin el campo `approved` es un usuario antiguo, que se considera aprobado.
+    function isApproved() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approved', true) == true;
+    }
+
+    // Por defecto, solo los usuarios aprobados acceden a los datos
     match /{document=**} {
-      allow read: if request.auth != null;
+      allow read, write: if isApproved();
     }
 
-    // Usuarios - cualquier usuario autenticado puede leer y actualizar
-    // (necesario para el sistema de aprobación de usuarios)
+    // Usuarios: esta regla se suma a la general, para que un pendiente pueda
+    // ver su propio documento y registrarse, sin poder aprobarse a sí mismo.
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
-    }
-
-    // Proyectos - todos los miembros pueden leer, solo autenticados pueden escribir
-    match /projects/{projectId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    // Transacciones - usuarios autenticados pueden crear/editar/eliminar
-    // (permitir crear transacciones para otros usuarios, ej: pagos directos)
-    match /transactions/{transactionId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Notificaciones - usuarios autenticados pueden crear y gestionar
-    match /notifications/{notificationId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Tareas - todos los usuarios autenticados pueden ver y gestionar todas las tareas
-    match /tasks/{taskId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Categorías - usuarios autenticados pueden crear, editar y eliminar
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Etapas de obra
-    match /stages/{stageId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Actividades de obra
-    match /activities/{activityId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Recibos - foto comprimida asociada a una transacción (doc id = transactionId)
-    match /receipts/{transactionId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Arqueos de caja - conteo físico vs saldo teórico, visible para todos
-    match /cashCounts/{countId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-
-    // Partidas de Brass Birmingham - todos los autenticados pueden gestionar
-    match /brassGames/{gameId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.approved == false;
+      // Pendientes antiguos sin rol: useAuthStore les asigna 'member' al entrar
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && !('role' in resource.data)
+        && request.resource.data.role == 'member'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
     }
   }
 }

@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import BottomNav from './BottomNav';
+import ErrorBoundary from './ErrorBoundary';
 import Toaster from './Toaster';
 import OfflineBanner from './OfflineBanner';
 
@@ -10,6 +12,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user } = useAuthStore();
+  const { pathname } = useLocation();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -23,7 +26,8 @@ export default function Layout({ children }: LayoutProps) {
             : undefined
         }
       >
-        {children}
+        {/* La key reinicia el error al navegar: el BottomNav sigue sirviendo de salida */}
+        <ErrorBoundary key={pathname}>{children}</ErrorBoundary>
       </main>
       {user && <BottomNav />}
       <OfflineBanner />
