@@ -141,7 +141,7 @@ export interface AuditChange {
 export interface AuditEntry {
   id: string;
   action: AuditAction;
-  entityType: 'transaction' | 'user' | 'backup' | 'commitment';
+  entityType: 'transaction' | 'user' | 'backup' | 'commitment' | 'payable';
   entityId: string;
   summary: string; // Descripción del movimiento o nombre del usuario afectado
   transactionType: TransactionType | null;
@@ -161,6 +161,18 @@ export interface CommitmentPeriod {
 export interface Commitment {
   userId: string;
   periods: CommitmentPeriod[]; // Ordenados por mes
+}
+
+// --- CUENTAS POR PAGAR ---
+export interface Payable {
+  id: string;
+  supplierName: string;
+  supplierPhone?: string;
+  description: string;
+  amount: number;
+  dueDate: Date;
+  status: 'pending' | 'paid';
+  paidTransactionId?: string; // Gasto con el que se pagó
 }
 
 // --- ARQUEO DE CAJA ---

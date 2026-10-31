@@ -27,12 +27,15 @@ const FIELD_LABELS: Record<string, string> = {
   receipt: 'Recibo',
   role: 'Rol',
   commitment: 'Compromiso mensual',
+  supplierName: 'Proveedor',
+  dueDate: 'Fecha de pago',
+  payableStatus: 'Estado',
 };
 
 const ROLE_LABELS: Record<string, string> = { member: 'Miembro', collaborator: 'Colaborador' };
 
 function describeAction(entry: AuditEntry): string {
-  const kind = entry.transactionType === 'expense' ? 'un gasto' : 'un aporte';
+  const kind = entry.entityType === 'payable' ? 'una cuenta por pagar' : entry.transactionType === 'expense' ? 'un gasto' : 'un aporte';
   switch (entry.action) {
     case 'create': return `registró ${kind}`;
     case 'update': return entry.entityType === 'commitment' ? 'cambió un compromiso de aporte' : `editó ${kind}`;
@@ -63,6 +66,7 @@ export default function AuditLog() {
       case 'commitment':
         return formatCurrency(Number(value));
       case 'date':
+      case 'dueDate':
         return format(new Date(String(value)), 'd MMM yyyy, HH:mm', { locale: es });
       case 'userId':
       case 'payerId':

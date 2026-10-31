@@ -23,9 +23,11 @@ interface TransactionFormProps {
   defaultProjectId?: string;
   transactionToEdit?: Transaction;
   defaultActivity?: { id: string; name: string; stageId: string; stageName: string };
+  prefill?: { amount: number; description: string };
+  onSaved?: (transactionId: string) => Promise<void>; // No debe lanzar: el gasto ya quedó guardado
 }
 
-export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit, defaultActivity }: TransactionFormProps) {
+export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit, defaultActivity, prefill, onSaved }: TransactionFormProps) {
   const { projects, categories, totalInBox, users, transactions, loading: dataLoading } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const user = useAuthStore((state) => state.user);
@@ -42,8 +44,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   // Estados
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [categoryId, setCategoryId] = useState<string>('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState(''); // Nombre corto
+  const [amount, setAmount] = useState(prefill ? String(Math.round(prefill.amount)) : '');
+  const [description, setDescription] = useState(prefill?.description ?? ''); // Nombre corto
   const [notes, setNotes] = useState(''); // Notas adicionales
 
   // FECHA Y HORA SEPARADAS
@@ -326,6 +328,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           toast('El gasto se guardó, pero la foto del recibo no se pudo subir', { type: 'error' });
         }
       }
+
+      if (onSaved && savedId) await onSaved(savedId);
 
       toast(isEditMode ? 'Cambios guardados' : 'Gasto registrado');
       onClose();

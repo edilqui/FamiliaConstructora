@@ -13,6 +13,7 @@ import {
   Building2,
   Dices,
   History,
+  ReceiptText,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -86,6 +87,13 @@ export default function Settings() {
   ];
 
   const toolsOptions: SettingOption[] = [
+    {
+      id: 'payables',
+      label: 'Cuentas por Pagar',
+      icon: ReceiptText,
+      path: '/settings/payables',
+      color: 'bg-rose-500',
+    },
     {
       id: 'history',
       label: 'Registro de Cambios',

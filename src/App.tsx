@@ -15,6 +15,7 @@ import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
 import BackupManager from './features/BackupManager';
 import AuditLog from './features/AuditLog';
+import Payables from './features/Payables';
 import BrassBirmingham from './features/BrassBirmingham';
 import BrassHistory from './features/BrassHistory';
 import ConstructionManager from './features/ConstructionManager';
@@ -198,6 +199,16 @@ function App() {
                 <UserApprovalManager />
               </Layout>
             </MemberRoute>
+          }
+        />
+        <Route
+          path="/settings/payables"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Payables />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
