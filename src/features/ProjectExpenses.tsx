@@ -11,6 +11,8 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import TransactionForm from './TransactionForm';
+import { useAuthStore } from '../store/useAuthStore';
+import { toast } from '../store/useToastStore';
 
 export default function ProjectExpenses() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -25,7 +27,13 @@ export default function ProjectExpenses() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  const collaborator = useAuthStore((state) => state.user?.role === 'collaborator');
+
   const handleEditTransaction = (transaction: typeof transactions[0]) => {
+    if (collaborator) {
+      toast('Solo un miembro puede modificar los gastos', { type: 'info' });
+      return;
+    }
     setTransactionToEdit(transaction);
     setShowExpenseForm(true);
   };
@@ -350,13 +358,15 @@ export default function ProjectExpenses() {
       </div>
 
       {/* --- FAB (Agregar Gasto Rápido) --- */}
-      <button
-        onClick={() => setShowExpenseForm(true)}
-        className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
-      >
-        <Minus className="w-6 h-6" />
-        <span className="font-medium text-sm pr-1">Gasto</span>
-      </button>
+      {!collaborator && (
+        <button
+          onClick={() => setShowExpenseForm(true)}
+          className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+        >
+          <Minus className="w-6 h-6" />
+          <span className="font-medium text-sm pr-1">Gasto</span>
+        </button>
+      )}
 
       {/* --- MODAL FORM --- */}
       {showExpenseForm && (

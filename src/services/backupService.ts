@@ -1,5 +1,10 @@
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { addAuditEntry } from './auditService';
+
+// Se guarda en la copia, pero restaurar nunca lo modifica: el registro de cambios
+// no se puede editar ni borrar, y debe seguir mostrando lo ocurrido.
+const EXPORT_ONLY_COLLECTIONS = ['auditLog'];
 
 // Colecciones a respaldar. Toda colección nueva de la app debe agregarse aquí.
 const COLLECTIONS_TO_BACKUP = [
@@ -63,7 +68,7 @@ export async function exportAllData(userId: string, userName: string, userEmail:
     }
   };
 
-  for (const collectionName of COLLECTIONS_TO_BACKUP) {
+  for (const collectionName of [...COLLECTIONS_TO_BACKUP, ...EXPORT_ONLY_COLLECTIONS]) {
     try {
       const collectionRef = collection(db, collectionName);
       const snapshot = await getDocs(collectionRef);
@@ -259,7 +264,7 @@ export interface ImportResult {
  * último y nunca se borra al usuario actual: sin su documento, las reglas de
  * Firestore le negarían cualquier otra escritura.
  */
-export async function importBackupData(backup: BackupData, currentUserId: string): Promise<ImportResult> {
+export async function importBackupData(backup: BackupData, currentUserId: string, currentUserName = ''): Promise<ImportResult> {
   const problem = validateBackup(backup, currentUserId);
   if (problem) return { success: false, imported: 0, deleted: 0, errors: [problem] };
 
@@ -329,6 +334,22 @@ export async function importBackupData(backup: BackupData, currentUserId: string
         errors: [`Los datos del backup se escribieron, pero falló la limpieza de ${collectionName}: ${(error as Error).message}. Puedes intentar de nuevo.`]
       };
     }
+  }
+
+  // Secundario: los datos ya se restauraron, un fallo aquí no debe reportarse como error
+  try {
+    const batch = writeBatch(db);
+    addAuditEntry(batch, {
+      action: 'restore',
+      entityType: 'backup',
+      entityId: backup.createdAt,
+      summary: `Copia del ${new Date(backup.createdAt).toLocaleDateString('es-CO')}: ${imported} restaurados, ${deleted} eliminados`,
+      actorId: currentUserId,
+      actorName: currentUserName,
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Restauración completa, pero no se pudo registrar:', error);
   }
 
   return { success: true, imported, deleted, errors: [] };

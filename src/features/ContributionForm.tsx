@@ -9,6 +9,7 @@ import CalculatorComponent from '../components/Calculator';
 import AmountInput from '../components/AmountInput';
 import { useModalHistory } from '../hooks/useModalHistory';
 import { toast } from '../store/useToastStore';
+import { isCollaborator } from '../lib/roles';
 
 interface ContributionFormProps {
   onClose: () => void;
@@ -22,6 +23,9 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   // Pago directo: este aporte solo cambia junto con su gasto, desde el gasto
   const isLinked = !!transactionToEdit?.linkedTransactionId;
   const linkedExpense = transactions.find((t) => t.id === transactionToEdit?.linkedTransactionId);
+  // Un colaborador registra sus propios aportes, pero no los modifica
+  const collaborator = isCollaborator(currentUser);
+  const isLocked = isLinked || (isEditMode && collaborator);
 
   // Estados
   const [userId, setUserId] = useState(currentUser?.id || '');
@@ -55,7 +59,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   }, [transactionToEdit]);
 
   const handleDelete = async () => {
-    if (!transactionToEdit || !currentUser || isLinked) return;
+    if (!transactionToEdit || !currentUser || isLocked) return;
     setLoading(true);
     try {
       const deleted = transactionToEdit; // Copia para poder deshacer
@@ -64,7 +68,8 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
         deletedBy: currentUser.id,
         deletedByName: currentUser.name,
         description: deleted.description,
-        projectName: 'Aporte'
+        projectName: 'Aporte',
+        before: deleted,
       });
       toast('Aporte eliminado', {
         actionLabel: 'Deshacer',
@@ -99,7 +104,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
     e.preventDefault();
     setError('');
 
-    if (isLinked) return;
+    if (isLocked) return;
     if (!currentUser) return setError('Debes iniciar sesión');
     if (!userId) return setError('Selecciona quién hace el aporte');
     
@@ -136,6 +141,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           date: transactionDate,
           updatedBy: currentUser.id,
           updatedByName: currentUser.name,
+          before: transactionToEdit,
         });
       } else {
         await addTransaction({
@@ -180,7 +186,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               <DollarSign className="w-6 h-6" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">
-              {isLinked ? 'Pago directo' : isEditMode ? 'Editar Aporte' : 'Nuevo Aporte'}
+              {isLinked ? 'Pago directo' : isLocked ? 'Detalle del Aporte' : isEditMode ? 'Editar Aporte' : 'Nuevo Aporte'}
             </h2>
           </div>
           <button onClick={onClose} aria-label="Cerrar formulario" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
@@ -198,16 +204,20 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             </div>
           )}
 
-          {isLinked && (
+          {isLocked && (
             <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
               <DollarSign className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-blue-800 leading-relaxed">
-                Este aporte viene del gasto <strong>{linkedExpense?.description ?? 'vinculado'}</strong>. Para cambiarlo o eliminarlo, abre ese gasto en Movimientos.
+                {collaborator ? (
+                  'Solo un miembro puede cambiar o eliminar un aporte ya registrado.'
+                ) : (
+                  <>Este aporte viene del gasto <strong>{linkedExpense?.description ?? 'vinculado'}</strong>. Para cambiarlo o eliminarlo, abre ese gasto en Movimientos.</>
+                )}
               </p>
             </div>
           )}
 
-          <fieldset disabled={isLinked} className="space-y-6 min-w-0 disabled:opacity-70">
+          <fieldset disabled={isLocked} className="space-y-6 min-w-0 disabled:opacity-70">
           {/* MONTO (Input Gigante) */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Monto del Aporte</label>
@@ -257,6 +267,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               <select
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
+                disabled={collaborator}
                 className="w-full appearance-none pl-10 pr-8 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
                 required
               >
@@ -323,7 +334,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           </fieldset>
 
           {/* INFO CARD */}
-          {!isLinked && <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
+          {!isLocked && <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
              <div className="mt-0.5">
                <DollarSign className="w-4 h-4 text-blue-600" />
              </div>
@@ -333,7 +344,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           </div>}
 
           {/* BOTONES DE ACCIÓN */}
-          {!isLinked && <div className="pt-2 flex flex-col gap-3">
+          {!isLocked && <div className="pt-2 flex flex-col gap-3">
             <button
               type="submit"
               disabled={loading}

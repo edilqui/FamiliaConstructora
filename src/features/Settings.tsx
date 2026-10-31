@@ -12,6 +12,7 @@ import {
   HardDrive,
   Building2,
   Dices,
+  History,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -45,6 +46,8 @@ export default function Settings() {
     }
   };
 
+  const isMember = user?.role === 'member';
+
   // Definimos las opciones agrupadas para mejor organización visual
   const managementOptions: SettingOption[] = [
     {
@@ -54,47 +57,59 @@ export default function Settings() {
       path: '/obra',
       color: 'bg-orange-500',
     },
-    {
-      id: 'categories',
-      label: 'Categorías de Gastos',
-      icon: Tag,
-      path: '/settings/categories',
-      color: 'bg-blue-500',
-    },
-    {
-      id: 'projects',
-      label: 'Proyectos y Obras',
-      icon: FolderKanban,
-      path: '/settings/projects',
-      color: 'bg-orange-500',
-    },
-    {
-      id: 'access-control',
-      label: 'Control de Acceso',
-      icon: UserCheck,
-      path: '/settings/access-control',
-      color: 'bg-emerald-500',
-    },
+    // Solo visibles para miembros (no colaboradores)
+    ...(isMember
+      ? [
+          {
+            id: 'categories',
+            label: 'Categorías de Gastos',
+            icon: Tag,
+            path: '/settings/categories',
+            color: 'bg-blue-500',
+          },
+          {
+            id: 'projects',
+            label: 'Proyectos y Obras',
+            icon: FolderKanban,
+            path: '/settings/projects',
+            color: 'bg-orange-500',
+          },
+          {
+            id: 'access-control',
+            label: 'Control de Acceso',
+            icon: UserCheck,
+            path: '/settings/access-control',
+            color: 'bg-emerald-500',
+          },
+        ]
+      : []),
   ];
 
   const toolsOptions: SettingOption[] = [
     {
-      id: 'tasks',
-      label: 'Tareas',
-      icon: ListTodo,
-      path: '/settings/tasks',
-      color: 'bg-teal-500',
+      id: 'history',
+      label: 'Registro de Cambios',
+      icon: History,
+      path: '/settings/history',
+      color: 'bg-indigo-500',
     },
-    {
-      id: 'backup',
-      label: 'Copias de Seguridad',
-      icon: HardDrive,
-      path: '/settings/backup',
-      color: 'bg-blue-500',
-    },
-    // Solo visible para miembros (no colaboradores)
-    ...(user?.role === 'member'
+    // Solo visibles para miembros (no colaboradores)
+    ...(isMember
       ? [
+          {
+            id: 'tasks',
+            label: 'Tareas',
+            icon: ListTodo,
+            path: '/settings/tasks',
+            color: 'bg-teal-500',
+          },
+          {
+            id: 'backup',
+            label: 'Copias de Seguridad',
+            icon: HardDrive,
+            path: '/settings/backup',
+            color: 'bg-blue-500',
+          },
           {
             id: 'brass',
             label: 'Brass Birmingham',

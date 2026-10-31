@@ -102,8 +102,14 @@ export const markAllNotificationsAsRead = async (notificationIds: string[], user
  * Elimina notificaciones que todos los usuarios han leído
  * (Se debe ejecutar periódicamente o después de que un usuario marque como leído)
  */
-export const cleanupReadNotifications = async (totalUsers: number) => {
+export const cleanupReadNotifications = async () => {
   try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const approvedUserIds = usersSnapshot.docs
+      .filter((userDoc) => userDoc.data().approved !== false)
+      .map((userDoc) => userDoc.id);
+    if (approvedUserIds.length === 0) return;
+
     const notificationsRef = collection(db, NOTIFICATIONS_COLLECTION);
     const q = query(notificationsRef);
     const snapshot = await getDocs(q);
@@ -112,8 +118,8 @@ export const cleanupReadNotifications = async (totalUsers: number) => {
 
     snapshot.forEach((docSnapshot) => {
       const notification = docSnapshot.data();
-      // Si todos los usuarios han leído la notificación, eliminarla
-      if (notification.readBy && notification.readBy.length >= totalUsers) {
+      // Si todos los usuarios aprobados la han leído, eliminarla
+      if (approvedUserIds.every((id) => notification.readBy?.includes(id))) {
         deletePromises.push(deleteDoc(doc(db, NOTIFICATIONS_COLLECTION, docSnapshot.id)));
       }
     });

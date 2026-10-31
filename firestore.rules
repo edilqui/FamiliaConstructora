@@ -1,32 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function myUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     // Aprobado = tiene documento en users y no está marcado approved: false.
     // Sin el campo `approved` es un usuario antiguo, que se considera aprobado.
     function isApproved() {
       return request.auth != null
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approved', true) == true;
+        && myUser().get('approved', true) == true;
     }
 
-    // Por defecto, solo los usuarios aprobados acceden a los datos
+    // Miembro = uno de los hermanos: administra la app. Sin rol es miembro antiguo.
+    function isMember() {
+      return isApproved() && myUser().get('role', 'member') == 'member';
+    }
+
+    // Por defecto, los aprobados ven todo y nadie escribe
     match /{document=**} {
-      allow read, write: if isApproved();
+      allow read: if isApproved();
     }
 
-    // Usuarios: esta regla se suma a la general, para que un pendiente pueda
-    // ver su propio documento y registrarse, sin poder aprobarse a sí mismo.
     match /users/{userId} {
+      allow write: if isMember();
+
+      // Para que un pendiente vea su documento y se registre, sin aprobarse a sí mismo
       allow get: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null
         && request.auth.uid == userId
         && request.resource.data.approved == false;
-      // Pendientes antiguos sin rol: useAuthStore les asigna 'member' al entrar
+
+      // Migraciones de usuarios antiguos que useAuthStore hace al entrar
       allow update: if request.auth != null
         && request.auth.uid == userId
-        && !('role' in resource.data)
-        && request.resource.data.role == 'member'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
+        && (
+          (!('role' in resource.data)
+            && request.resource.data.role == 'member'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']))
+          || (!('approved' in resource.data)
+            && request.resource.data.approved == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved']))
+        );
     }
+
+    // Los miembros gestionan todo; un colaborador solo registra sus propios aportes
+    match /transactions/{transactionId} {
+      allow write: if isMember();
+      allow create: if isApproved()
+        && request.resource.data.type == 'contribution'
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.registeredBy == request.auth.uid
+        && !('linkedTransactionId' in request.resource.data);
+    }
+
+    // Registro de cambios: solo se agrega, a nombre de quien actúa. Nadie lo edita ni lo borra.
+    match /auditLog/{entryId} {
+      allow create: if isApproved()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // Todos reciben y descartan avisos
+    match /notifications/{notificationId} {
+      allow write: if isApproved();
+    }
+
+    match /projects/{id} { allow write: if isMember(); }
+    match /categories/{id} { allow write: if isMember(); }
+    match /stages/{id} { allow write: if isMember(); }
+    match /activities/{id} { allow write: if isMember(); }
+    match /receipts/{id} { allow write: if isMember(); }
+    match /cashCounts/{id} { allow write: if isMember(); }
+    match /tasks/{id} { allow write: if isMember(); }
+    match /brassGames/{id} { allow write: if isMember(); }
   }
 }

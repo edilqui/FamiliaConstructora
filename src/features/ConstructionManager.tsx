@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useModalHistory } from '../hooks/useModalHistory';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { useAuthStore } from '../store/useAuthStore';
 import { toast } from '../store/useToastStore';
 import AmountInput from '../components/AmountInput';
 import { useConstructionData } from '../hooks/useConstructionData';
@@ -87,6 +88,7 @@ const defaultActivityForm = (): ActivityFormData => ({ name: '', estimatedBudget
 
 export default function ConstructionManager() {
   const navigate = useNavigate();
+  const canEdit = useAuthStore((state) => state.user?.role !== 'collaborator');
   const { stages, activities, loading } = useConstructionData();
   const { projects, transactions } = useDashboardData();
 
@@ -365,20 +367,24 @@ export default function ConstructionManager() {
               {stageActivities.length} actividad{stageActivities.length !== 1 ? 'es' : ''}
             </button>
             <div className="flex-1" />
-            <button
-              onClick={() => openEditStage(stage)}
-              aria-label={`Editar etapa ${stage.name}`}
-              className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              <Edit2 className="w-[18px] h-[18px]" />
-            </button>
-            <button
-              onClick={() => { setDeletingStageId(stage.id); setDeleteError(''); }}
-              aria-label={`Eliminar etapa ${stage.name}`}
-              className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 className="w-[18px] h-[18px]" />
-            </button>
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => openEditStage(stage)}
+                  aria-label={`Editar etapa ${stage.name}`}
+                  className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  <Edit2 className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  onClick={() => { setDeletingStageId(stage.id); setDeleteError(''); }}
+                  aria-label={`Eliminar etapa ${stage.name}`}
+                  className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-[18px] h-[18px]" />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -386,21 +392,23 @@ export default function ConstructionManager() {
         {isExpanded && (
           <div className="border-t border-gray-100">
             {stageActivities.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">Sin actividades. Agrega una.</p>
+              <p className="text-sm text-gray-400 text-center py-4">Sin actividades.{canEdit && ' Agrega una.'}</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {stageActivities.map((activity) => renderActivityRow(activity))}
               </div>
             )}
-            <div className="p-3">
-              <button
-                onClick={() => openNewActivity(stage.id)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Nueva Actividad
-              </button>
-            </div>
+            {canEdit && (
+              <div className="p-3">
+                <button
+                  onClick={() => openNewActivity(stage.id)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nueva Actividad
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -424,20 +432,24 @@ export default function ConstructionManager() {
           </button>
           <div className="flex items-center gap-1 flex-shrink-0">
             <StatusBadge status={activity.status} type="activity" />
-            <button
-              onClick={() => openEditActivity(activity)}
-              aria-label={`Editar actividad ${activity.name}`}
-              className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              <Edit2 className="w-[18px] h-[18px]" />
-            </button>
-            <button
-              onClick={() => { setDeletingActivityId(activity.id); setDeleteError(''); }}
-              aria-label={`Eliminar actividad ${activity.name}`}
-              className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 className="w-[18px] h-[18px]" />
-            </button>
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => openEditActivity(activity)}
+                  aria-label={`Editar actividad ${activity.name}`}
+                  className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  <Edit2 className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  onClick={() => { setDeletingActivityId(activity.id); setDeleteError(''); }}
+                  aria-label={`Eliminar actividad ${activity.name}`}
+                  className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-[18px] h-[18px]" />
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="mt-2 space-y-1.5 ml-5">
@@ -625,7 +637,7 @@ export default function ConstructionManager() {
             </div>
             <h1 className="text-lg font-bold text-gray-900">Avance de Obra</h1>
           </div>
-          {activeTab === 'gestion' && (
+          {activeTab === 'gestion' && canEdit && (
             <button
               onClick={openNewStage}
               className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-3 py-2 rounded-xl transition-colors active:scale-95 shadow-sm shadow-orange-200"
@@ -702,10 +714,14 @@ export default function ConstructionManager() {
                   <Building2 className="w-8 h-8 text-orange-400" />
                 </div>
                 <p className="text-gray-500 font-medium">No hay etapas</p>
-                <p className="text-sm text-gray-400">Crea la primera etapa de tu obra.</p>
-                <button onClick={openNewStage} className="inline-flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-semibold text-sm">
-                  <Plus className="w-4 h-4" /> Nueva Etapa
-                </button>
+                {canEdit && (
+                  <>
+                    <p className="text-sm text-gray-400">Crea la primera etapa de tu obra.</p>
+                    <button onClick={openNewStage} className="inline-flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-semibold text-sm">
+                      <Plus className="w-4 h-4" /> Nueva Etapa
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               filteredStages.map(renderStageCard)

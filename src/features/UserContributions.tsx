@@ -416,6 +416,7 @@ export default function UserContributions() {
           registeredByName={getRegisteredByName(detailContribution)}
           onClose={() => setDetailId(null)}
           onEdit={() => handleEditContribution(detailContribution)}
+          canEdit={currentUser?.role !== 'collaborator'}
         />
       )}
 

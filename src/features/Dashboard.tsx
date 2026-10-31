@@ -897,12 +897,14 @@ export default function Dashboard() {
                 <Plus className="w-6 h-6" />
               </div>
             </button>
-            <button onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1 group">
-              <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">Gasto</span>
-              <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors">
-                <Minus className="w-6 h-6" />
-              </div>
-            </button>
+            {currentUser?.role !== 'collaborator' && (
+              <button onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1 group">
+                <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">Gasto</span>
+                <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                  <Minus className="w-6 h-6" />
+                </div>
+              </button>
+            )}
           </div>
         )}
         <button

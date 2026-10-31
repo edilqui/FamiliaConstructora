@@ -40,9 +40,8 @@ export const useNotifications = () => {
     try {
       await markNotificationAsRead(notificationId, user.id);
 
-      // Limpiar notificaciones que todos han leído (asumo 4 usuarios)
-      // Puedes ajustar esto para obtener el número real de usuarios
-      await cleanupReadNotifications(4);
+      // Limpiar notificaciones que todos han leído
+      await cleanupReadNotifications();
     } catch (error) {
       console.error('Error al marcar notificación como leída:', error);
     }
@@ -56,7 +55,7 @@ export const useNotifications = () => {
       await markAllNotificationsAsRead(notificationIds, user.id);
 
       // Limpiar notificaciones que todos han leído
-      await cleanupReadNotifications(4);
+      await cleanupReadNotifications();
     } catch (error) {
       console.error('Error al marcar todas como leídas:', error);
     }

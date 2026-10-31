@@ -32,7 +32,13 @@ export default function Expenses() {
   const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
   const [isFabOpen, setIsFabOpen] = useState(false);
 
+  const collaborator = user?.role === 'collaborator';
+
   const handleEditTransaction = (transaction: typeof transactions[0]) => {
+    if (collaborator && transaction.type === 'expense') {
+      toast('Solo un miembro puede modificar los gastos', { type: 'info' });
+      return;
+    }
     setTransactionToEdit(transaction);
     if (transaction.type === 'expense') setShowExpenseForm(true);
     else setShowContributionForm(true);
@@ -69,13 +75,14 @@ export default function Expenses() {
 
   const startLongPress = useCallback((id: string) => {
     longPressActivated.current = false;
+    if (collaborator) return;
     longPressTimer.current = setTimeout(() => {
       longPressActivated.current = true;
       if (navigator.vibrate) navigator.vibrate(50);
       setIsSelectionMode(true);
       setSelectedIds(new Set([id]));
     }, 500);
-  }, []);
+  }, [collaborator]);
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimer.current) {
@@ -116,10 +123,10 @@ export default function Expenses() {
   // ── Bulk actions (solo aplican a gastos) ───────────────────────────────────
   const handleBulkCategory = async () => {
     if (!bulkCategoryId) { setBulkError('Selecciona una categoría'); return; }
-    if (selectedExpenseIds.length === 0) { setBulkError('Ningún gasto seleccionado'); return; }
+    if (selectedExpenseIds.length === 0 || !user) { setBulkError('Ningún gasto seleccionado'); return; }
     setIsBulkSaving(true); setBulkError('');
     try {
-      await bulkUpdateTransactions(selectedExpenseIds, { categoryId: bulkCategoryId, categoryName: bulkCategoryName });
+      await bulkUpdateTransactions(selectedExpenses, { categoryId: bulkCategoryId, categoryName: bulkCategoryName }, user);
       toast(`Categoría aplicada a ${selectedExpenseIds.length} gasto${selectedExpenseIds.length !== 1 ? 's' : ''}`);
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
@@ -128,13 +135,13 @@ export default function Expenses() {
 
   const handleBulkActivity = async () => {
     if (!bulkActivityId) { setBulkError('Selecciona una actividad'); return; }
-    if (selectedExpenseIds.length === 0) { setBulkError('Ningún gasto seleccionado'); return; }
+    if (selectedExpenseIds.length === 0 || !user) { setBulkError('Ningún gasto seleccionado'); return; }
     setIsBulkSaving(true); setBulkError('');
     try {
-      await bulkUpdateTransactions(selectedExpenseIds, {
+      await bulkUpdateTransactions(selectedExpenses, {
         stageId: bulkStageId, stageName: bulkStageName,
         activityId: bulkActivityId, activityName: bulkActivityName,
-      });
+      }, user);
       toast(`Actividad aplicada a ${selectedExpenseIds.length} gasto${selectedExpenseIds.length !== 1 ? 's' : ''}`);
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
@@ -142,10 +149,10 @@ export default function Expenses() {
   };
 
   const handleBulkClearActivity = async () => {
-    if (selectedExpenseIds.length === 0) { setBulkError('Ningún gasto seleccionado'); return; }
+    if (selectedExpenseIds.length === 0 || !user) { setBulkError('Ningún gasto seleccionado'); return; }
     setIsBulkSaving(true); setBulkError('');
     try {
-      await bulkClearActivityFromTransactions(selectedExpenseIds);
+      await bulkClearActivityFromTransactions(selectedExpenses, user);
       toast('Asociación de obra eliminada');
       exitSelectionMode();
     } catch { setBulkError('Error al guardar, intenta de nuevo'); }
@@ -219,10 +226,11 @@ export default function Expenses() {
   const allVisibleSelected = filteredTransactions.length > 0 && filteredTransactions.every(t => selectedIds.has(t.id));
 
   // Solo los gastos dentro de la selección son elegibles para cambios de categoría/actividad
-  const selectedExpenseIds = useMemo(
-    () => filteredTransactions.filter(t => selectedIds.has(t.id) && t.type === 'expense').map(t => t.id),
+  const selectedExpenses = useMemo(
+    () => filteredTransactions.filter(t => selectedIds.has(t.id) && t.type === 'expense'),
     [filteredTransactions, selectedIds],
   );
+  const selectedExpenseIds = selectedExpenses.map(t => t.id);
 
   const groupedCategories = useMemo(() => {
     const groups = categories.filter(c => c.isGroup === true);
@@ -587,10 +595,12 @@ export default function Expenses() {
                 <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">Nuevo Aporte</span>
                 <div className="w-10 h-10 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center hover:bg-emerald-600 transition-colors"><Plus className="w-6 h-6" /></div>
               </button>
-              <button onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1">
-                <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">Registrar Gasto</span>
-                <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors"><Minus className="w-6 h-6" /></div>
-              </button>
+              {!collaborator && (
+                <button onClick={() => { setShowExpenseForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1">
+                  <span className="bg-white text-gray-700 text-xs font-semibold px-2 py-1 rounded-md shadow-sm border border-gray-100">Registrar Gasto</span>
+                  <div className="w-10 h-10 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors"><Minus className="w-6 h-6" /></div>
+                </button>
+              )}
             </div>
           )}
           <button

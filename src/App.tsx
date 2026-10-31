@@ -14,6 +14,7 @@ import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
 import BackupManager from './features/BackupManager';
+import AuditLog from './features/AuditLog';
 import BrassBirmingham from './features/BrassBirmingham';
 import BrassHistory from './features/BrassHistory';
 import ConstructionManager from './features/ConstructionManager';
@@ -44,6 +45,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+// Pantallas de administración: un colaborador no entra aunque tenga el enlace
+function MemberRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((state) => state.user);
+  if (user?.role === 'collaborator') return <Navigate to="/" replace />;
+  return <ProtectedRoute>{children}</ProtectedRoute>;
 }
 
 function App() {
@@ -155,39 +163,49 @@ function App() {
         <Route
           path="/settings/categories"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <CategoriesManager />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route
           path="/settings/projects"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <ProjectsManager />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route
           path="/settings/tasks"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <TasksManager />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route
           path="/settings/access-control"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <UserApprovalManager />
+              </Layout>
+            </MemberRoute>
+          }
+        />
+        <Route
+          path="/settings/history"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AuditLog />
               </Layout>
             </ProtectedRoute>
           }
@@ -195,31 +213,31 @@ function App() {
         <Route
           path="/settings/backup"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <BackupManager />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route
           path="/settings/brass"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <BrassBirmingham />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route
           path="/settings/brass/history"
           element={
-            <ProtectedRoute>
+            <MemberRoute>
               <Layout>
                 <BrassHistory />
               </Layout>
-            </ProtectedRoute>
+            </MemberRoute>
           }
         />
         <Route

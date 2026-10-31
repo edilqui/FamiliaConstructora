@@ -7,11 +7,11 @@ import {
   query,
   onSnapshot,
   doc,
-  updateDoc,
   serverTimestamp,
-  deleteDoc
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { addAuditEntry } from '../services/auditService';
 import {
   ArrowLeft,
   Shield,
@@ -118,13 +118,23 @@ export default function UserApprovalManager() {
 
     setProcessingId(userId);
     try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', userId), {
         approved: true,
         role: role,
         approvedBy: currentUser.id,
         approvedAt: serverTimestamp(),
       });
+      addAuditEntry(batch, {
+        action: 'approve',
+        entityType: 'user',
+        entityId: userId,
+        summary: users.find((u) => u.id === userId)?.name ?? 'Usuario',
+        changes: [{ field: 'role', from: null, to: role }],
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+      });
+      await batch.commit();
       console.log('Usuario aprobado como', role);
     } catch (error) {
       console.error('Error al aprobar usuario:', error);
@@ -135,10 +145,23 @@ export default function UserApprovalManager() {
   };
 
   const handleChangeRole = async (userId: string, newRole: UserRole) => {
+    if (!currentUser) return;
+
+    const target = users.find((u) => u.id === userId);
     setProcessingId(userId);
     try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, { role: newRole });
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', userId), { role: newRole });
+      addAuditEntry(batch, {
+        action: 'role_change',
+        entityType: 'user',
+        entityId: userId,
+        summary: target?.name ?? 'Usuario',
+        changes: [{ field: 'role', from: target?.role ?? null, to: newRole }],
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+      });
+      await batch.commit();
       console.log('Rol cambiado a', newRole);
     } catch (error) {
       console.error('Error al cambiar rol:', error);
@@ -147,11 +170,26 @@ export default function UserApprovalManager() {
     }
   };
 
+  const deleteUserWithAudit = async (userId: string) => {
+    if (!currentUser) return;
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'users', userId));
+    addAuditEntry(batch, {
+      action: 'user_removed',
+      entityType: 'user',
+      entityId: userId,
+      summary: users.find((u) => u.id === userId)?.name ?? 'Usuario',
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+    });
+    await batch.commit();
+  };
+
   const handleReject = async (userId: string) => {
     setProcessingId(userId);
     try {
-      const userRef = doc(db, 'users', userId);
-      await deleteDoc(userRef);
+      await deleteUserWithAudit(userId);
       console.log('Usuario rechazado y eliminado');
     } catch (error) {
       console.error('Error al rechazar usuario:', error);
@@ -167,8 +205,7 @@ export default function UserApprovalManager() {
 
     setProcessingId(userId);
     try {
-      const userRef = doc(db, 'users', userId);
-      await deleteDoc(userRef);
+      await deleteUserWithAudit(userId);
       console.log('Usuario eliminado');
     } catch (error) {
       console.error('Error al eliminar usuario:', error);

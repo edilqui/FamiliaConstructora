@@ -164,7 +164,7 @@ export default function BackupManager() {
     setImportStatus('importing');
 
     try {
-      const result = await importBackupData(backupToImport, user.id);
+      const result = await importBackupData(backupToImport, user.id, user.name);
 
       setImportResult(result);
       setImportStatus(result.success ? 'success' : 'error');

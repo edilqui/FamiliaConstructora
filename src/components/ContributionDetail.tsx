@@ -11,11 +11,12 @@ interface ContributionDetailProps {
   registeredByName?: string;
   onClose: () => void;
   onEdit: () => void;
+  canEdit?: boolean;
 }
 
 // Detalle de solo lectura: consultar un aporte no debe abrir directamente el
 // formulario que permite modificarlo o eliminarlo.
-export default function ContributionDetail({ contribution, runningTotal, registeredByName, onClose, onEdit }: ContributionDetailProps) {
+export default function ContributionDetail({ contribution, runningTotal, registeredByName, onClose, onEdit, canEdit = true }: ContributionDetailProps) {
   useModalHistory(true, onClose);
 
   return (
@@ -66,7 +67,11 @@ export default function ContributionDetail({ contribution, runningTotal, registe
             )}
           </dl>
 
-          {contribution.linkedTransactionId ? (
+          {!canEdit ? (
+            <p className="text-xs text-blue-800 bg-blue-50/70 border border-blue-100 rounded-xl p-3 leading-relaxed">
+              Solo un miembro puede cambiar o eliminar un aporte ya registrado.
+            </p>
+          ) : contribution.linkedTransactionId ? (
             <p className="text-xs text-blue-800 bg-blue-50/70 border border-blue-100 rounded-xl p-3 leading-relaxed">
               Este aporte viene de un pago directo. Para cambiarlo o eliminarlo, abre su gasto en Movimientos.
             </p>

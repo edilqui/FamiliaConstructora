@@ -129,6 +129,29 @@ export interface Activity {
   completedAt?: Date;
 }
 
+// --- REGISTRO DE CAMBIOS ---
+export type AuditAction = 'create' | 'update' | 'delete' | 'approve' | 'role_change' | 'user_removed' | 'restore';
+
+export interface AuditChange {
+  field: string;
+  from: string | number | null;
+  to: string | number | null;
+}
+
+export interface AuditEntry {
+  id: string;
+  action: AuditAction;
+  entityType: 'transaction' | 'user' | 'backup';
+  entityId: string;
+  summary: string; // Descripción del movimiento o nombre del usuario afectado
+  transactionType: TransactionType | null;
+  amount: number | null;
+  changes: AuditChange[];
+  actorId: string;
+  actorName: string;
+  createdAt: Date;
+}
+
 // --- ARQUEO DE CAJA ---
 export interface CashCount {
   id: string;

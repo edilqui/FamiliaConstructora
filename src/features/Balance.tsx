@@ -369,12 +369,14 @@ export default function Balance() {
                 <p className="text-xs text-gray-500">¿El efectivo físico coincide con la app?</p>
               </div>
             </div>
-            <button
-              onClick={() => { setCountedAmount(''); setShowCashCount(true); }}
-              className="bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform flex-shrink-0"
-            >
-              Contar caja
-            </button>
+            {!isCollaborator && (
+              <button
+                onClick={() => { setCountedAmount(''); setShowCashCount(true); }}
+                className="bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform flex-shrink-0"
+              >
+                Contar caja
+              </button>
+            )}
           </div>
 
           {lastCashCount ? (
@@ -614,6 +616,7 @@ export default function Balance() {
           registeredByName={users.find((u) => u.id === detailContribution.registeredBy)?.name}
           onClose={() => setDetailId(null)}
           onEdit={() => handleEditContribution(detailContribution)}
+          canEdit={!isCollaborator}
         />
       )}
 

@@ -152,6 +152,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
         description: deleted.description,
         projectName: selectedProject?.name || 'Proyecto',
         linkedTransactionId: deleted.linkedTransactionId,
+        before: deleted,
       });
       toast(deletedContribution ? 'Gasto y aporte vinculado eliminados' : 'Gasto eliminado', {
         actionLabel: 'Deshacer',
@@ -267,6 +268,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             id: linkedContribution.id,
             description: buildDirectPaymentDescription(directPayerName || 'usuario', expenseDescription),
           },
+          before: transactionToEdit,
         });
       } else {
         if (paymentSource !== 'caja') {
@@ -337,10 +339,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
         try {
           if (receiptDataUrl) {
             await saveReceipt(savedId, receiptDataUrl, user.id);
-            await setTransactionHasReceipt(savedId, true);
+            await setTransactionHasReceipt(savedId, true, expenseDescription, user);
           } else if (isEditMode) {
             await deleteReceipt(savedId);
-            await setTransactionHasReceipt(savedId, false);
+            await setTransactionHasReceipt(savedId, false, expenseDescription, user);
           }
         } catch {
           toast('El gasto se guardó, pero la foto del recibo no se pudo subir', { type: 'error' });

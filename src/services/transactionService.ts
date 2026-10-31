@@ -1,8 +1,15 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, deleteField, writeBatch } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { TransactionType } from '../types';
+import { Transaction, TransactionType } from '../types';
 import { createNotification } from './notificationService';
 import { deleteReceipt } from './receiptService';
+import { addAuditEntry } from './auditService';
+import { diffTransaction } from '../lib/audit';
+
+interface Actor {
+  id: string;
+  name: string;
+}
 
 interface AddTransactionParams {
   amount: number;
@@ -76,6 +83,17 @@ export const addDirectPayment = async (
   const batch = writeBatch(db);
   batch.set(expenseRef, { ...buildTransactionData(expense), linkedTransactionId: contributionRef.id });
   batch.set(contributionRef, { ...buildTransactionData(contribution), linkedTransactionId: expenseRef.id });
+  addAuditEntry(batch, {
+    action: 'create',
+    entityType: 'transaction',
+    entityId: expenseRef.id,
+    summary: expense.description,
+    transactionType: 'expense',
+    amount: expense.amount,
+    changes: [{ field: 'payerId', from: null, to: contribution.userId }],
+    actorId: expense.registeredBy,
+    actorName: expense.registeredByName,
+  });
   await batch.commit();
 
   // Notificación secundaria: un solo aviso por el pago, no uno por cada documento
@@ -103,9 +121,20 @@ export const addTransaction = async (params: AddTransactionParams): Promise<stri
   const { amount, project, type, registeredBy, registeredByName, description } = params;
 
   try {
-    const transactionsRef = collection(db, 'transactions');
-
-    const docRef = await addDoc(transactionsRef, buildTransactionData(params));
+    const docRef = doc(collection(db, 'transactions'));
+    const batch = writeBatch(db);
+    batch.set(docRef, buildTransactionData(params));
+    addAuditEntry(batch, {
+      action: 'create',
+      entityType: 'transaction',
+      entityId: docRef.id,
+      summary: description,
+      transactionType: type,
+      amount,
+      actorId: registeredBy,
+      actorName: registeredByName,
+    });
+    await batch.commit();
 
     // La notificación es secundaria: si falla, la transacción YA se guardó y no
     // debe reportarse como error (el usuario reintentaría y duplicaría el movimiento).
@@ -138,10 +167,22 @@ export const addTransaction = async (params: AddTransactionParams): Promise<stri
 };
 
 /** Marca (o desmarca) que una transacción tiene foto de recibo asociada */
-export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean): Promise<void> => {
-  await updateDoc(doc(db, 'transactions', id), {
+export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean, description: string, actor: Actor): Promise<void> => {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'transactions', id), {
     hasReceipt: hasReceipt ? true : deleteField(),
   });
+  addAuditEntry(batch, {
+    action: 'update',
+    entityType: 'transaction',
+    entityId: id,
+    summary: description,
+    transactionType: 'expense',
+    changes: [{ field: 'receipt', from: hasReceipt ? null : 'Con foto', to: hasReceipt ? 'Con foto' : null }],
+    actorId: actor.id,
+    actorName: actor.name,
+  });
+  await batch.commit();
 };
 
 interface UpdateTransactionParams {
@@ -165,10 +206,11 @@ interface UpdateTransactionParams {
   stageId?: string | null;
   stageName?: string | null;
   linkedContribution?: { id: string; description: string }; // Pago directo: aporte que debe seguir al gasto
+  before: Transaction; // Estado previo, para el registro de cambios
 }
 
 export const updateTransaction = async (params: UpdateTransactionParams): Promise<void> => {
-  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName, linkedContribution } = params;
+  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName, linkedContribution, before } = params;
 
   try {
     const transactionRef = doc(db, 'transactions', id);
@@ -204,19 +246,37 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
     data.stageId      = stageId      || deleteField();
     data.stageName    = stageName    || deleteField();
 
+    const batch = writeBatch(db);
+    batch.update(transactionRef, data);
     if (linkedContribution) {
-      const batch = writeBatch(db);
-      batch.update(transactionRef, data);
       batch.update(doc(db, 'transactions', linkedContribution.id), {
         amount,
         date,
         description: linkedContribution.description,
         notes: notes || deleteField(),
       });
-      await batch.commit();
-    } else {
-      await updateDoc(transactionRef, data);
     }
+    const changes = diffTransaction(before, {
+      amount, description, date, notes, project, categoryName, userId,
+      // undefined = el campo no se tocó (ver arriba)
+      quantity: quantity === undefined ? before.quantity : quantity,
+      unitPrice: unitPrice === undefined ? before.unitPrice : unitPrice,
+      stageName, activityName,
+    });
+    if (changes.length > 0) {
+      addAuditEntry(batch, {
+        action: 'update',
+        entityType: 'transaction',
+        entityId: id,
+        summary: description,
+        transactionType: type,
+        amount,
+        changes,
+        actorId: updatedBy,
+        actorName: updatedByName,
+      });
+    }
+    await batch.commit();
 
     // Notificación secundaria: no debe convertir una edición exitosa en "error"
     try {
@@ -245,24 +305,56 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
   }
 };
 
-export const bulkUpdateTransactions = async (
-  ids: string[],
-  updates: Record<string, any>
+// Cada movimiento usa 2 escrituras (cambio + registro); Firestore limita los lotes
+const BULK_CHUNK_SIZE = 200;
+
+const applyBulkUpdate = async (
+  transactions: Transaction[],
+  updates: Record<string, any>,
+  auditedValues: Record<string, string | null>,
+  actor: Actor
 ): Promise<void> => {
-  if (ids.length === 0) return;
-  const batch = writeBatch(db);
-  ids.forEach(id => batch.update(doc(db, 'transactions', id), updates));
-  await batch.commit();
+  for (let i = 0; i < transactions.length; i += BULK_CHUNK_SIZE) {
+    const batch = writeBatch(db);
+    transactions.slice(i, i + BULK_CHUNK_SIZE).forEach((t) => {
+      batch.update(doc(db, 'transactions', t.id), updates);
+      const changes = diffTransaction(t, { ...t, ...auditedValues });
+      if (changes.length > 0) {
+        addAuditEntry(batch, {
+          action: 'update',
+          entityType: 'transaction',
+          entityId: t.id,
+          summary: t.description,
+          transactionType: t.type,
+          amount: t.amount,
+          changes,
+          actorId: actor.id,
+          actorName: actor.name,
+        });
+      }
+    });
+    await batch.commit();
+  }
 };
 
-export const bulkClearActivityFromTransactions = async (ids: string[]): Promise<void> => {
-  return bulkUpdateTransactions(ids, {
-    stageId: deleteField(),
-    stageName: deleteField(),
-    activityId: deleteField(),
-    activityName: deleteField(),
-  });
-};
+export const bulkUpdateTransactions = (
+  transactions: Transaction[],
+  updates: Record<string, string>,
+  actor: Actor
+): Promise<void> => applyBulkUpdate(transactions, updates, updates, actor);
+
+export const bulkClearActivityFromTransactions = (transactions: Transaction[], actor: Actor): Promise<void> =>
+  applyBulkUpdate(
+    transactions,
+    {
+      stageId: deleteField(),
+      stageName: deleteField(),
+      activityId: deleteField(),
+      activityName: deleteField(),
+    },
+    { stageName: null, activityName: null },
+    actor
+  );
 
 interface DeleteTransactionParams {
   id: string;
@@ -271,21 +363,31 @@ interface DeleteTransactionParams {
   description: string; // Descripción de la transacción eliminada
   projectName: string; // Nombre del proyecto
   linkedTransactionId?: string; // Pago directo: la otra mitad se elimina junto con esta
+  before: Transaction; // Lo que se elimina, para que quede en el registro de cambios
 }
 
 export const deleteTransaction = async (params: DeleteTransactionParams): Promise<void> => {
-  const { id, deletedBy, deletedByName, description, projectName, linkedTransactionId } = params;
+  const { id, deletedBy, deletedByName, description, projectName, linkedTransactionId, before } = params;
 
   try {
     const transactionRef = doc(db, 'transactions', id);
+    const batch = writeBatch(db);
+    batch.delete(transactionRef);
     if (linkedTransactionId) {
-      const batch = writeBatch(db);
-      batch.delete(transactionRef);
       batch.delete(doc(db, 'transactions', linkedTransactionId));
-      await batch.commit();
-    } else {
-      await deleteDoc(transactionRef);
     }
+    addAuditEntry(batch, {
+      action: 'delete',
+      entityType: 'transaction',
+      entityId: id,
+      summary: description,
+      transactionType: before.type,
+      amount: before.amount,
+      changes: diffTransaction(before, {}),
+      actorId: deletedBy,
+      actorName: deletedByName,
+    });
+    await batch.commit();
 
     // Borrar la foto del recibo asociada (si existe); no es fatal si falla
     try {
