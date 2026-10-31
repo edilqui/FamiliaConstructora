@@ -5,7 +5,8 @@ import { useConstructionData } from '../hooks/useConstructionData';
 import { useAuthStore } from '../store/useAuthStore';
 import { addTransaction, addDirectPayment, updateTransaction, deleteTransaction, setTransactionHasReceipt } from '../services/transactionService';
 import { buildDirectPaymentDescription } from '../lib/directPayments';
-import { saveReceipt, getReceipt, deleteReceipt } from '../services/receiptService';
+import { saveReceipt, deleteReceipt } from '../services/receiptService';
+import ReceiptField, { useReceiptField } from '../components/ReceiptField';
 import { compressImageToDataUrl } from '../lib/imageCompression';
 import { formatCurrency, cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -68,25 +69,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [unitPrice, setUnitPrice] = useState('');
 
   // Foto del recibo (opcional)
-  const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
-  const [receiptChanged, setReceiptChanged] = useState(false);
-  const [receiptLoading, setReceiptLoading] = useState(false);
-  const [receiptError, setReceiptError] = useState('');
-
-  const handleReceiptSelect = async (file: File | undefined) => {
-    if (!file) return;
-    setReceiptError('');
-    setReceiptLoading(true);
-    try {
-      const dataUrl = await compressImageToDataUrl(file);
-      setReceiptDataUrl(dataUrl);
-      setReceiptChanged(true);
-    } catch (err) {
-      setReceiptError(err instanceof Error ? err.message : 'No se pudo procesar la foto.');
-    } finally {
-      setReceiptLoading(false);
-    }
-  };
+  const receipt = useReceiptField(transactionToEdit);
 
   // El atrás del sistema cierra el formulario (y primero la confirmación de borrado)
   useModalHistory(true, onClose);
@@ -128,13 +111,6 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       }
 
       // Cargar la foto del recibo existente
-      if (transactionToEdit.hasReceipt) {
-        setReceiptLoading(true);
-        getReceipt(transactionToEdit.id)
-          .then((image) => setReceiptDataUrl(image))
-          .catch(() => setReceiptError('No se pudo cargar la foto del recibo.'))
-          .finally(() => setReceiptLoading(false));
-      }
     }
   }, [transactionToEdit]);
 
@@ -337,10 +313,10 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       }
 
       // Guardar/quitar la foto del recibo (secundario: el gasto ya se guardó)
-      if (receiptChanged && savedId) {
+      if (receipt.changed && savedId) {
         try {
-          if (receiptDataUrl) {
-            await saveReceipt(savedId, receiptDataUrl, user.id);
+          if (receipt.dataUrl) {
+            await saveReceipt(savedId, receipt.dataUrl, user.id);
             await setTransactionHasReceipt(savedId, true, expenseDescription, user);
           } else if (isEditMode) {
             await deleteReceipt(savedId);
@@ -619,53 +595,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           </div>
 
           {/* FOTO DEL RECIBO (Opcional) */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block ml-1">Foto del Recibo (Opcional)</label>
-            <input
-              id="receipt-input"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => { handleReceiptSelect(e.target.files?.[0]); e.target.value = ''; }}
-            />
-            {receiptLoading ? (
-              <div className="flex items-center justify-center gap-2 py-6 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500">
-                <Loader2 className="w-4 h-4 animate-spin" /> Procesando foto...
-              </div>
-            ) : receiptDataUrl ? (
-              <div className="space-y-2">
-                <img
-                  src={receiptDataUrl}
-                  alt="Recibo del gasto"
-                  className="w-full max-h-56 object-contain bg-gray-900/5 rounded-xl border border-gray-200"
-                />
-                <div className="flex gap-2">
-                  <label
-                    htmlFor="receipt-input"
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl cursor-pointer transition-colors"
-                  >
-                    <Camera className="w-4 h-4" /> Cambiar foto
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => { setReceiptDataUrl(null); setReceiptChanged(true); setReceiptError(''); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
-                  >
-                    <ImageOff className="w-4 h-4" /> Quitar foto
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label
-                htmlFor="receipt-input"
-                className="flex items-center justify-center gap-2 py-6 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-600 cursor-pointer transition-colors"
-              >
-                <Camera className="w-5 h-5 text-gray-400" />
-                Tomar o elegir foto
-              </label>
-            )}
-            {receiptError && <p className="text-xs text-red-500 mt-2">{receiptError}</p>}
-          </div>
+          <ReceiptField field={receipt} label="Foto del Recibo (Opcional)" alt="Recibo del gasto" />
 
           {/* FECHA Y HORA (GRID) */}
           <div className="grid grid-cols-3 gap-4">

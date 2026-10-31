@@ -167,7 +167,7 @@ export const addTransaction = async (params: AddTransactionParams): Promise<stri
 };
 
 /** Marca (o desmarca) que una transacción tiene foto de recibo asociada */
-export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean, description: string, actor: Actor): Promise<void> => {
+export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean, description: string, actor: Actor, type: TransactionType = 'expense'): Promise<void> => {
   const batch = writeBatch(db);
   batch.update(doc(db, 'transactions', id), {
     hasReceipt: hasReceipt ? true : deleteField(),
@@ -177,7 +177,7 @@ export const setTransactionHasReceipt = async (id: string, hasReceipt: boolean, 
     entityType: 'transaction',
     entityId: id,
     summary: description,
-    transactionType: 'expense',
+    transactionType: type,
     changes: [{ field: 'receipt', from: hasReceipt ? null : 'Con foto', to: hasReceipt ? 'Con foto' : null }],
     actorId: actor.id,
     actorName: actor.name,

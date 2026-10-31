@@ -53,6 +53,11 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.registeredBy == request.auth.uid
         && !('linkedTransactionId' in request.resource.data);
+      // ...y marca que el aporte que registró tiene comprobante
+      allow update: if isApproved()
+        && resource.data.type == 'contribution'
+        && resource.data.registeredBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasReceipt']);
     }
 
     // Registro de cambios: solo se agrega, a nombre de quien actúa. Nadie lo edita ni lo borra.
@@ -71,7 +76,14 @@ service cloud.firestore {
     match /categories/{id} { allow write: if isMember(); }
     match /stages/{id} { allow write: if isMember(); }
     match /activities/{id} { allow write: if isMember(); }
-    match /receipts/{id} { allow write: if isMember(); }
+    match /commitments/{id} { allow write: if isMember(); }
+    match /receipts/{id} {
+      allow write: if isMember();
+      // Comprobante del aporte que el colaborador acaba de registrar
+      allow create: if isApproved()
+        && get(/databases/$(database)/documents/transactions/$(id)).data.type == 'contribution'
+        && get(/databases/$(database)/documents/transactions/$(id)).data.registeredBy == request.auth.uid;
+    }
     match /cashCounts/{id} { allow write: if isMember(); }
     match /tasks/{id} { allow write: if isMember(); }
     match /brassGames/{id} { allow write: if isMember(); }

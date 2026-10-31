@@ -141,7 +141,7 @@ export interface AuditChange {
 export interface AuditEntry {
   id: string;
   action: AuditAction;
-  entityType: 'transaction' | 'user' | 'backup';
+  entityType: 'transaction' | 'user' | 'backup' | 'commitment';
   entityId: string;
   summary: string; // Descripción del movimiento o nombre del usuario afectado
   transactionType: TransactionType | null;
@@ -150,6 +150,17 @@ export interface AuditEntry {
   actorId: string;
   actorName: string;
   createdAt: Date;
+}
+
+// --- COMPROMISOS DE APORTE ---
+export interface CommitmentPeriod {
+  from: string; // Mes en que empieza a regir, 'yyyy-MM'
+  amount: number;
+}
+
+export interface Commitment {
+  userId: string;
+  periods: CommitmentPeriod[]; // Ordenados por mes
 }
 
 // --- ARQUEO DE CAJA ---

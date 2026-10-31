@@ -16,6 +16,7 @@ const COLLECTIONS_TO_BACKUP = [
   'activities',
   'receipts',
   'cashCounts',
+  'commitments',
   'notifications',
   'tasks',
   'brassGames'

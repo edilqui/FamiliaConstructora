@@ -2,7 +2,9 @@ import { useState, FormEvent, useEffect } from 'react';
 import { X, Loader2, DollarSign, Calendar, Trash2, AlertTriangle, Clock, ChevronDown, User, Calculator } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuthStore } from '../store/useAuthStore';
-import { addTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
+import { addTransaction, updateTransaction, deleteTransaction, setTransactionHasReceipt } from '../services/transactionService';
+import { saveReceipt, deleteReceipt } from '../services/receiptService';
+import ReceiptField, { useReceiptField } from '../components/ReceiptField';
 import { format } from 'date-fns';
 import type { Transaction } from '../types';
 import CalculatorComponent from '../components/Calculator';
@@ -26,6 +28,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   // Un colaborador registra sus propios aportes, pero no los modifica
   const collaborator = isCollaborator(currentUser);
   const isLocked = isLinked || (isEditMode && collaborator);
+  const receipt = useReceiptField(transactionToEdit);
 
   // Estados
   const [userId, setUserId] = useState(currentUser?.id || '');
@@ -127,7 +130,10 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
         return setError('La fecha y hora no pueden ser futuras');
       }
 
+      const savedDescription = description || `Aporte de ${userName}`;
+      let savedId: string;
       if (isEditMode && transactionToEdit) {
+        savedId = transactionToEdit.id;
         await updateTransaction({
           id: transactionToEdit.id,
           amount: amountValue,
@@ -137,7 +143,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           categoryId: null,
           categoryName: 'N/A',
           userId: userId,
-          description: description || `Aporte de ${userName}`,
+          description: savedDescription,
           notes: notes || undefined,
           date: transactionDate,
           updatedBy: currentUser.id,
@@ -145,7 +151,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           before: transactionToEdit,
         });
       } else {
-        await addTransaction({
+        savedId = await addTransaction({
           amount: amountValue,
           project: 'Aporte',
           type: 'contribution',
@@ -155,11 +161,27 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           userId: userId,
           registeredBy: currentUser.id,
           registeredByName: currentUser.name,
-          description: description || `Aporte de ${userName}`,
+          description: savedDescription,
           notes: notes || undefined,
           date: transactionDate,
         });
       }
+
+      // Guardar/quitar el comprobante (secundario: el aporte ya se guardó)
+      if (receipt.changed) {
+        try {
+          if (receipt.dataUrl) {
+            await saveReceipt(savedId, receipt.dataUrl, currentUser.id);
+            await setTransactionHasReceipt(savedId, true, savedDescription, currentUser, 'contribution');
+          } else if (isEditMode) {
+            await deleteReceipt(savedId);
+            await setTransactionHasReceipt(savedId, false, savedDescription, currentUser, 'contribution');
+          }
+        } catch {
+          toast('El aporte se guardó, pero el comprobante no se pudo subir', { type: 'error' });
+        }
+      }
+
       toast(isEditMode ? 'Cambios guardados' : 'Aporte registrado');
       onClose();
     } catch (err) {
@@ -333,6 +355,10 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
           </div>
 
           </fieldset>
+
+          {!isLinked && (!isLocked || receipt.dataUrl) && (
+            <ReceiptField field={receipt} label="Comprobante (Opcional)" alt="Comprobante del aporte" readOnly={isLocked} />
+          )}
 
           {/* INFO CARD */}
           {!isLocked && <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">

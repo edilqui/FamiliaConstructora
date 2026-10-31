@@ -26,6 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   activityName: 'Actividad',
   receipt: 'Recibo',
   role: 'Rol',
+  commitment: 'Compromiso mensual',
 };
 
 const ROLE_LABELS: Record<string, string> = { member: 'Miembro', collaborator: 'Colaborador' };
@@ -34,7 +35,7 @@ function describeAction(entry: AuditEntry): string {
   const kind = entry.transactionType === 'expense' ? 'un gasto' : 'un aporte';
   switch (entry.action) {
     case 'create': return `registró ${kind}`;
-    case 'update': return `editó ${kind}`;
+    case 'update': return entry.entityType === 'commitment' ? 'cambió un compromiso de aporte' : `editó ${kind}`;
     case 'delete': return `eliminó ${kind}`;
     case 'approve': return 'aprobó a un usuario';
     case 'role_change': return 'cambió el rol de un usuario';
@@ -59,6 +60,7 @@ export default function AuditLog() {
     switch (change.field) {
       case 'amount':
       case 'unitPrice':
+      case 'commitment':
         return formatCurrency(Number(value));
       case 'date':
         return format(new Date(String(value)), 'd MMM yyyy, HH:mm', { locale: es });

@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
 import ContributionDetail from '../components/ContributionDetail';
+import CommitmentCard from '../components/CommitmentCard';
 import { getRunningTotals, sortOldestFirst } from '../lib/contributions';
 import { buildContributionStatementCsv, downloadCsv } from '../lib/exportCsv';
 import { toast } from '../store/useToastStore';
@@ -277,6 +278,12 @@ export default function UserContributions() {
             )}
           </div>
         </div>
+
+        <CommitmentCard
+          userId={targetUser.id}
+          userName={targetUser.name}
+          contributions={transactions.filter((t) => t.type === 'contribution' && t.userId === targetUser.id)}
+        />
 
         {/* --- HISTORIAL DE APORTES --- */}
         <div>

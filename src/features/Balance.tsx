@@ -10,6 +10,7 @@ import {
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { useModalHistory } from '../hooks/useModalHistory';
+import CommitmentCard from '../components/CommitmentCard';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -248,6 +249,12 @@ export default function Balance() {
             </div>
           </div>
         </div>
+
+        <CommitmentCard
+          userId={user.id}
+          userName={user.name}
+          contributions={transactions.filter((t) => t.type === 'contribution' && t.userId === user.id)}
+        />
 
         {/* --- PROGRESO HACIA META DE PRESUPUESTOS --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">

@@ -1,4 +1,6 @@
 import { X, TrendingUp, Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getReceipt } from '../services/receiptService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '../lib/utils';
@@ -18,6 +20,12 @@ interface ContributionDetailProps {
 // formulario que permite modificarlo o eliminarlo.
 export default function ContributionDetail({ contribution, runningTotal, registeredByName, onClose, onEdit, canEdit = true }: ContributionDetailProps) {
   useModalHistory(true, onClose);
+
+  const [receipt, setReceipt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!contribution.hasReceipt) return;
+    getReceipt(contribution.id).then(setReceipt).catch(() => setReceipt(null));
+  }, [contribution.id, contribution.hasReceipt]);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Detalle del aporte" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -66,6 +74,10 @@ export default function ContributionDetail({ contribution, runningTotal, registe
               </div>
             )}
           </dl>
+
+          {receipt && (
+            <img src={receipt} alt="Comprobante del aporte" className="w-full max-h-72 object-contain bg-gray-900/5 rounded-xl border border-gray-200" />
+          )}
 
           {!canEdit ? (
             <p className="text-xs text-blue-800 bg-blue-50/70 border border-blue-100 rounded-xl p-3 leading-relaxed">
