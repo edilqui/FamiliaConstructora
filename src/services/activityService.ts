@@ -13,6 +13,8 @@ interface CreateActivityParams {
   status: ActivityStatus;
   progressPercent: number;
   order: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
 }
 
 export const createActivity = async (params: CreateActivityParams): Promise<string> => {

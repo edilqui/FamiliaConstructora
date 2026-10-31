@@ -19,6 +19,7 @@ import Payables from './features/Payables';
 import BrassBirmingham from './features/BrassBirmingham';
 import BrassHistory from './features/BrassHistory';
 import ConstructionManager from './features/ConstructionManager';
+import SiteLog from './features/SiteLog';
 import ActivityDetail from './features/ActivityDetail';
 import PendingApproval from './features/PendingApproval';
 import Login from './features/Login';
@@ -257,6 +258,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <ActivityDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/obra/bitacora"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SiteLog />
               </Layout>
             </ProtectedRoute>
           }

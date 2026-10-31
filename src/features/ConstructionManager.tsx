@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
-  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight,
+  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight, CalendarDays, BookOpen,
 } from 'lucide-react';
 import { useModalHistory } from '../hooks/useModalHistory';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAuthStore } from '../store/useAuthStore';
 import { toast } from '../store/useToastStore';
 import AmountInput from '../components/AmountInput';
+import ScheduleView from '../components/ScheduleView';
 import { useConstructionData } from '../hooks/useConstructionData';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
@@ -65,7 +66,7 @@ function ProgressBar({ value, max, color = 'bg-orange-500' }: { value: number; m
 
 // ── types ───────────────────────────────────────────────────────────────────
 
-type ActiveTab = 'gestion' | 'progreso';
+type ActiveTab = 'gestion' | 'progreso' | 'cronograma';
 
 interface StageFormData {
   name: string;
@@ -79,10 +80,12 @@ interface ActivityFormData {
   estimatedBudget: string;
   status: ActivityStatus;
   progressPercent: string;
+  plannedStart: string;
+  plannedEnd: string;
 }
 
 const defaultStageForm = (): StageFormData => ({ name: '', projectId: '', estimatedBudget: '', status: 'pending' });
-const defaultActivityForm = (): ActivityFormData => ({ name: '', estimatedBudget: '', status: 'pending', progressPercent: '0' });
+const defaultActivityForm = (): ActivityFormData => ({ name: '', estimatedBudget: '', status: 'pending', progressPercent: '0', plannedStart: '', plannedEnd: '' });
 
 // ── main component ──────────────────────────────────────────────────────────
 
@@ -246,6 +249,8 @@ export default function ConstructionManager() {
       estimatedBudget: activity.estimatedBudget > 0 ? String(Math.round(activity.estimatedBudget)) : '',
       status: activity.status,
       progressPercent: activity.progressPercent.toString(),
+      plannedStart: activity.plannedStart ?? '',
+      plannedEnd: activity.plannedEnd ?? '',
     });
     setActivityError('');
     setShowActivityModal(true);
@@ -255,6 +260,8 @@ export default function ConstructionManager() {
     e.preventDefault();
     setActivityError('');
     if (!activityForm.name.trim()) return setActivityError('El nombre es requerido.');
+    if (!activityForm.plannedStart !== !activityForm.plannedEnd) return setActivityError('Indica inicio y fin, o deja ambas fechas vacías.');
+    if (activityForm.plannedEnd < activityForm.plannedStart) return setActivityError('El fin no puede ser antes del inicio.');
     setActivitySaving(true);
     try {
       const budget = parseFloat(activityForm.estimatedBudget) || 0;
@@ -266,6 +273,8 @@ export default function ConstructionManager() {
           estimatedBudget: budget,
           status: activityForm.status,
           progressPercent: progress,
+          plannedStart: activityForm.plannedStart || null,
+          plannedEnd: activityForm.plannedEnd || null,
           completedAt: activityForm.status === 'completed' ? new Date() : null,
         });
       } else {
@@ -277,6 +286,8 @@ export default function ConstructionManager() {
           estimatedBudget: budget,
           status: activityForm.status,
           progressPercent: progress,
+          plannedStart: activityForm.plannedStart || null,
+          plannedEnd: activityForm.plannedEnd || null,
           order,
         });
       }
@@ -638,6 +649,14 @@ export default function ConstructionManager() {
             </div>
             <h1 className="text-lg font-bold text-gray-900">Avance de Obra</h1>
           </div>
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/obra/bitacora')}
+            aria-label="Bitácora de obra"
+            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <BookOpen className="w-5 h-5" />
+          </button>
           {activeTab === 'gestion' && canEdit && (
             <button
               onClick={openNewStage}
@@ -647,6 +666,7 @@ export default function ConstructionManager() {
               Nueva Etapa
             </button>
           )}
+          </div>
         </div>
       </header>
       <div style={{ height: spacerHeight }} />
@@ -674,6 +694,16 @@ export default function ConstructionManager() {
           >
             <TrendingUp className="w-4 h-4" />
             Progreso
+          </button>
+          <button
+            onClick={() => setActiveTab('cronograma')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
+              activeTab === 'cronograma' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+            )}
+          >
+            <CalendarDays className="w-4 h-4" />
+            Fechas
           </button>
         </div>
 
@@ -707,6 +737,8 @@ export default function ConstructionManager() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>
+        ) : activeTab === 'cronograma' ? (
+          <ScheduleView activities={activities.filter((a) => filteredStages.some((s) => s.id === a.stageId))} />
         ) : activeTab === 'gestion' ? (
           <div className="space-y-3">
             {filteredStages.length === 0 ? (
@@ -856,6 +888,28 @@ export default function ConstructionManager() {
                     placeholder="0"
                     aria-label="Presupuesto estimado de la actividad"
                     className="w-full pl-8 pr-4 bg-gray-50 border border-gray-200 rounded-xl py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="activity-start" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5 ml-1">Inicio planeado</label>
+                  <input
+                    id="activity-start"
+                    type="date"
+                    value={activityForm.plannedStart}
+                    onChange={(e) => setActivityForm({ ...activityForm, plannedStart: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="activity-end" className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5 ml-1">Fin planeado</label>
+                  <input
+                    id="activity-end"
+                    type="date"
+                    value={activityForm.plannedEnd}
+                    onChange={(e) => setActivityForm({ ...activityForm, plannedEnd: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-orange-400 outline-none font-medium"
                   />
                 </div>
               </div>

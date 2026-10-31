@@ -27,7 +27,7 @@ export default function BottomNav() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path
-              || (item.path === '/obra' && location.pathname.startsWith('/activity/'));
+              || (item.path === '/obra' && /^\/(activity|obra)\//.test(location.pathname));
 
             return (
               <Link

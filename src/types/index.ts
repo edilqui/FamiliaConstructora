@@ -127,6 +127,20 @@ export interface Activity {
   order: number;
   createdAt: Date;
   completedAt?: Date;
+  plannedStart?: string | null; // 'yyyy-MM-dd'
+  plannedEnd?: string | null;
+}
+
+// --- BITÁCORA DE OBRA ---
+export interface SiteLogEntry {
+  id: string;
+  date: string; // 'yyyy-MM-dd'
+  text: string;
+  hasPhoto: boolean;
+  activityName?: string;
+  authorId: string;
+  authorName: string;
+  createdAt: Date;
 }
 
 // --- REGISTRO DE CAMBIOS ---
