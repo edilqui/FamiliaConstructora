@@ -3,7 +3,8 @@ import { X, Loader2, Receipt, Calendar, Trash2, AlertTriangle, Wallet, Clock, Ch
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
 import { useAuthStore } from '../store/useAuthStore';
-import { addTransaction, updateTransaction, deleteTransaction, setTransactionHasReceipt } from '../services/transactionService';
+import { addTransaction, addDirectPayment, updateTransaction, deleteTransaction, setTransactionHasReceipt } from '../services/transactionService';
+import { buildDirectPaymentDescription } from '../lib/directPayments';
 import { saveReceipt, getReceipt, deleteReceipt } from '../services/receiptService';
 import { compressImageToDataUrl } from '../lib/imageCompression';
 import { formatCurrency, cn } from '../lib/utils';
@@ -23,10 +24,18 @@ interface TransactionFormProps {
 }
 
 export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
-  const { projects, categories, totalInBox, users } = useDashboardData();
+  const { projects, categories, totalInBox, users, transactions, loading: dataLoading } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const user = useAuthStore((state) => state.user);
   const isEditMode = !!transactionToEdit;
+
+  // Pago directo: aporte vinculado que debe seguir a este gasto
+  const linkedContribution = transactionToEdit?.linkedTransactionId
+    ? transactions.find((t) => t.id === transactionToEdit.linkedTransactionId)
+    : undefined;
+  const directPayerName = users.find((u) => u.id === linkedContribution?.userId)?.name;
+  // Sin los movimientos cargados no se sabe si el aporte vinculado existe
+  const waitingForLinkedData = !!transactionToEdit?.linkedTransactionId && dataLoading;
 
   // Estados
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
@@ -130,21 +139,24 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
 
   const handleDelete = async () => {
     if (!transactionToEdit || !user) return;
+    if (waitingForLinkedData) return setError('Cargando datos del pago. Intenta en un momento.');
     setLoading(true);
     try {
       const selectedProject = projects.find(p => p.id === transactionToEdit.projectId);
       const deleted = transactionToEdit; // Copia para poder deshacer
+      const deletedContribution = linkedContribution;
       await deleteTransaction({
         id: deleted.id,
         deletedBy: user.id,
         deletedByName: user.name,
         description: deleted.description,
-        projectName: selectedProject?.name || 'Proyecto'
+        projectName: selectedProject?.name || 'Proyecto',
+        linkedTransactionId: deleted.linkedTransactionId,
       });
-      toast('Gasto eliminado', {
+      toast(deletedContribution ? 'Gasto y aporte vinculado eliminados' : 'Gasto eliminado', {
         actionLabel: 'Deshacer',
         onAction: () => {
-          addTransaction({
+          const restoredExpense = {
             amount: deleted.amount,
             project: deleted.project,
             type: deleted.type,
@@ -163,7 +175,25 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
             activityName: deleted.activityName,
             stageId: deleted.stageId,
             stageName: deleted.stageName,
-          }).then(() => toast('Gasto restaurado'))
+          };
+          const restored = deletedContribution
+            ? addDirectPayment(restoredExpense, {
+                amount: deletedContribution.amount,
+                project: deletedContribution.project,
+                type: deletedContribution.type,
+                projectId: deletedContribution.projectId,
+                categoryId: deletedContribution.categoryId,
+                categoryName: deletedContribution.categoryName,
+                userId: deletedContribution.userId,
+                registeredBy: user.id,
+                registeredByName: user.name,
+                description: deletedContribution.description,
+                notes: deletedContribution.notes,
+                date: deletedContribution.date,
+              })
+            : addTransaction(restoredExpense);
+          restored
+            .then(() => toast('Gasto restaurado'))
             .catch(() => toast('No se pudo restaurar el gasto', { type: 'error' }));
         },
       });
@@ -181,6 +211,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
     setError('');
 
     if (!user) return setError('Debes iniciar sesión');
+    if (waitingForLinkedData) return setError('Cargando datos del pago. Intenta en un momento.');
     if (!projectId) return setError('Selecciona un proyecto');
     if (!categoryId) return setError('Selecciona una categoría');
     
@@ -209,6 +240,8 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
 
       let savedId = transactionToEdit?.id ?? '';
 
+      const expenseDescription = description || `Gasto en ${selectedProject?.name}`;
+
       if (isEditMode && transactionToEdit) {
         await updateTransaction({
           id: transactionToEdit.id,
@@ -219,7 +252,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           categoryId: categoryId,
           categoryName: selectedCategory?.name || 'Sin categoría',
           userId: transactionToEdit.userId,
-          description: description || `Gasto en ${selectedProject?.name}`,
+          description: expenseDescription,
           notes: notes || undefined,
           quantity: detailedMode && quantity ? parseFloat(quantity) : null,
           unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : null,
@@ -230,46 +263,51 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
           activityName: selectedActivityName || null,
           stageId: selectedStageId || null,
           stageName: selectedStageName || null,
+          linkedContribution: linkedContribution && {
+            id: linkedContribution.id,
+            description: buildDirectPaymentDescription(directPayerName || 'usuario', expenseDescription),
+          },
         });
       } else {
         if (paymentSource !== 'caja') {
           const payingUser = users.find(u => u.id === paymentSource);
-          // 1. Aporte
-          await addTransaction({
-            amount: amountValue,
-            project: 'Aporte',
-            type: 'contribution',
-            projectId: null,
-            categoryId: null,
-            categoryName: 'N/A',
-            userId: paymentSource,
-            registeredBy: user.id,
-            registeredByName: user.name,
-            description: `Aporte de ${payingUser?.name || 'usuario'} (pago directo)`,
-            notes: notes || undefined,
-            date: transactionDate,
-          });
-          // 2. Gasto
-          savedId = await addTransaction({
-            amount: amountValue,
-            project: selectedProject?.name || 'Gasto',
-            type: 'expense',
-            projectId: projectId,
-            categoryId: categoryId,
-            categoryName: selectedCategory?.name || 'Sin categoría',
-            userId: user.id,
-            registeredBy: user.id,
-            registeredByName: user.name,
-            description: description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`,
-            notes: notes || undefined,
-            quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
-            unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
-            date: transactionDate,
-            activityId: selectedActivityId || null,
-            activityName: selectedActivityName || null,
-            stageId: selectedStageId || null,
-            stageName: selectedStageName || null,
-          });
+          const directExpenseDescription = description || `Gasto en ${selectedProject?.name} (por ${payingUser?.name})`;
+          savedId = await addDirectPayment(
+            {
+              amount: amountValue,
+              project: selectedProject?.name || 'Gasto',
+              type: 'expense',
+              projectId: projectId,
+              categoryId: categoryId,
+              categoryName: selectedCategory?.name || 'Sin categoría',
+              userId: user.id,
+              registeredBy: user.id,
+              registeredByName: user.name,
+              description: directExpenseDescription,
+              notes: notes || undefined,
+              quantity: detailedMode && quantity ? parseFloat(quantity) : undefined,
+              unitPrice: detailedMode && unitPrice ? parseFloat(unitPrice) : undefined,
+              date: transactionDate,
+              activityId: selectedActivityId || null,
+              activityName: selectedActivityName || null,
+              stageId: selectedStageId || null,
+              stageName: selectedStageName || null,
+            },
+            {
+              amount: amountValue,
+              project: 'Aporte',
+              type: 'contribution',
+              projectId: null,
+              categoryId: null,
+              categoryName: 'N/A',
+              userId: paymentSource,
+              registeredBy: user.id,
+              registeredByName: user.name,
+              description: buildDirectPaymentDescription(payingUser?.name || 'usuario', directExpenseDescription),
+              notes: notes || undefined,
+              date: transactionDate,
+            }
+          );
         } else {
           savedId = await addTransaction({
             amount: amountValue,
@@ -551,6 +589,16 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                </div>
+            </div>
+          )}
+
+          {/* PAGO DIRECTO VINCULADO (Solo Editar) */}
+          {linkedContribution && (
+            <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
+              <Wallet className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-800 leading-relaxed">
+                <strong>{directPayerName || 'Un miembro'}</strong> pagó este gasto de su bolsillo. Si cambias el monto, la fecha o las notas, o lo eliminas, su aporte cambiará igual.
+              </p>
             </div>
           )}
 

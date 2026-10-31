@@ -48,6 +48,7 @@ export interface Transaction {
   stageId?: string | null; // ID de etapa de obra (opcional)
   stageName?: string | null; // Nombre de la etapa (para mostrar)
   hasReceipt?: boolean; // true si hay foto de recibo en receipts/{id}
+  linkedTransactionId?: string; // Pago directo: id de la otra mitad (aporte <-> gasto)
   createdAt: Date;
 }
 

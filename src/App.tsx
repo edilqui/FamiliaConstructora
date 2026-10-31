@@ -14,6 +14,7 @@ import ProjectExpenses from './features/ProjectExpenses';
 import UserContributions from './features/UserContributions';
 import UserApprovalManager from './features/UserApprovalManager';
 import BackupManager from './features/BackupManager';
+import DirectPaymentsReview from './features/DirectPaymentsReview';
 import BrassBirmingham from './features/BrassBirmingham';
 import BrassHistory from './features/BrassHistory';
 import ConstructionManager from './features/ConstructionManager';
@@ -198,6 +199,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <BackupManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/direct-payments"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DirectPaymentsReview />
               </Layout>
             </ProtectedRoute>
           }

@@ -66,12 +66,18 @@ export default function ContributionDetail({ contribution, runningTotal, registe
             )}
           </dl>
 
-          <button
-            onClick={onEdit}
-            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-          >
-            <Pencil className="w-4 h-4" /> Editar o eliminar
-          </button>
+          {contribution.linkedTransactionId ? (
+            <p className="text-xs text-blue-800 bg-blue-50/70 border border-blue-100 rounded-xl p-3 leading-relaxed">
+              Este aporte viene de un pago directo. Para cambiarlo o eliminarlo, abre su gasto en Movimientos.
+            </p>
+          ) : (
+            <button
+              onClick={onEdit}
+              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+            >
+              <Pencil className="w-4 h-4" /> Editar o eliminar
+            </button>
+          )}
         </div>
       </div>
     </div>

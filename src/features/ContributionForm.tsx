@@ -16,9 +16,12 @@ interface ContributionFormProps {
 }
 
 export default function ContributionForm({ onClose, transactionToEdit }: ContributionFormProps) {
-  const { users } = useDashboardData();
+  const { users, transactions } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
   const isEditMode = !!transactionToEdit;
+  // Pago directo: este aporte solo cambia junto con su gasto, desde el gasto
+  const isLinked = !!transactionToEdit?.linkedTransactionId;
+  const linkedExpense = transactions.find((t) => t.id === transactionToEdit?.linkedTransactionId);
 
   // Estados
   const [userId, setUserId] = useState(currentUser?.id || '');
@@ -52,7 +55,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
   }, [transactionToEdit]);
 
   const handleDelete = async () => {
-    if (!transactionToEdit || !currentUser) return;
+    if (!transactionToEdit || !currentUser || isLinked) return;
     setLoading(true);
     try {
       const deleted = transactionToEdit; // Copia para poder deshacer
@@ -96,6 +99,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
     e.preventDefault();
     setError('');
 
+    if (isLinked) return;
     if (!currentUser) return setError('Debes iniciar sesión');
     if (!userId) return setError('Selecciona quién hace el aporte');
     
@@ -176,7 +180,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
               <DollarSign className="w-6 h-6" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">
-              {isEditMode ? 'Editar Aporte' : 'Nuevo Aporte'}
+              {isLinked ? 'Pago directo' : isEditMode ? 'Editar Aporte' : 'Nuevo Aporte'}
             </h2>
           </div>
           <button onClick={onClose} aria-label="Cerrar formulario" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
@@ -194,6 +198,16 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             </div>
           )}
 
+          {isLinked && (
+            <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
+              <DollarSign className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Este aporte viene del gasto <strong>{linkedExpense?.description ?? 'vinculado'}</strong>. Para cambiarlo o eliminarlo, abre ese gasto en Movimientos.
+              </p>
+            </div>
+          )}
+
+          <fieldset disabled={isLinked} className="space-y-6 min-w-0 disabled:opacity-70">
           {/* MONTO (Input Gigante) */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Monto del Aporte</label>
@@ -306,18 +320,20 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
             </div>
           </div>
 
+          </fieldset>
+
           {/* INFO CARD */}
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
+          {!isLinked && <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-3">
              <div className="mt-0.5">
                <DollarSign className="w-4 h-4 text-blue-600" />
              </div>
              <p className="text-xs text-blue-800 leading-relaxed">
                Este dinero entrará a la <strong>caja común</strong> y afectará positivamente el balance de {users.find(u => u.id === userId)?.name || 'el usuario'}.
              </p>
-          </div>
+          </div>}
 
           {/* BOTONES DE ACCIÓN */}
-          <div className="pt-2 flex flex-col gap-3">
+          {!isLinked && <div className="pt-2 flex flex-col gap-3">
             <button
               type="submit"
               disabled={loading}
@@ -336,7 +352,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
                  <Trash2 className="w-4 h-4" /> Eliminar este aporte
                </button>
             )}
-          </div>
+          </div>}
         </form>
 
         {/* --- MODAL CONFIRMACIÓN BORRADO (NESTED) --- */}

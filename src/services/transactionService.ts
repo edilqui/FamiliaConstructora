@@ -3,6 +3,7 @@ import { db } from '../config/firebase';
 import { TransactionType } from '../types';
 import { createNotification } from './notificationService';
 import { deleteReceipt } from './receiptService';
+import type { DirectPaymentPair } from '../lib/directPayments';
 
 interface AddTransactionParams {
   amount: number;
@@ -25,46 +26,87 @@ interface AddTransactionParams {
   stageName?: string | null;
 }
 
+const buildTransactionData = (params: AddTransactionParams) => {
+  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
+
+  const data: any = {
+    amount,
+    project,
+    type,
+    projectId,
+    categoryId,
+    categoryName,
+    userId,
+    registeredBy,
+    description,
+    date: date || new Date(), // Usa la fecha proporcionada o la fecha actual
+    createdAt: serverTimestamp(),
+  };
+
+  // Solo incluir notes si tiene valor
+  if (notes) {
+    data.notes = notes;
+  }
+
+  if (quantity !== undefined && quantity !== null) {
+    data.quantity = quantity;
+  }
+  if (unitPrice !== undefined && unitPrice !== null) {
+    data.unitPrice = unitPrice;
+  }
+  if (activityId) {
+    data.activityId = activityId;
+    data.activityName = activityName ?? null;
+    data.stageId = stageId ?? null;
+    data.stageName = stageName ?? null;
+  }
+
+  return data;
+};
+
+// Pago directo: el aporte y el gasto se guardan juntos y vinculados, o no se
+// guarda ninguno. Devuelve el id del gasto (necesario para asociarle un recibo).
+export const addDirectPayment = async (
+  expense: AddTransactionParams,
+  contribution: AddTransactionParams
+): Promise<string> => {
+  const transactionsRef = collection(db, 'transactions');
+  const expenseRef = doc(transactionsRef);
+  const contributionRef = doc(transactionsRef);
+
+  const batch = writeBatch(db);
+  batch.set(expenseRef, { ...buildTransactionData(expense), linkedTransactionId: contributionRef.id });
+  batch.set(contributionRef, { ...buildTransactionData(contribution), linkedTransactionId: expenseRef.id });
+  await batch.commit();
+
+  // Notificación secundaria: un solo aviso por el pago, no uno por cada documento
+  try {
+    await createNotification({
+      type: 'expense_created',
+      message: `${expense.registeredByName} registró un gasto en ${expense.project}`,
+      createdBy: expense.registeredBy,
+      createdByName: expense.registeredByName,
+      transactionId: expenseRef.id,
+      transactionDescription: expense.description,
+      amount: expense.amount,
+      projectName: expense.project,
+      excludeUserId: expense.registeredBy,
+    });
+  } catch (notificationError) {
+    console.error('Pago directo guardado, pero falló la notificación:', notificationError);
+  }
+
+  return expenseRef.id;
+};
+
 // Devuelve el id del documento creado (necesario para asociarle un recibo)
 export const addTransaction = async (params: AddTransactionParams): Promise<string> => {
-  const { amount, project, type, projectId, categoryId, categoryName, userId, registeredBy, registeredByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
+  const { amount, project, type, registeredBy, registeredByName, description } = params;
 
   try {
     const transactionsRef = collection(db, 'transactions');
 
-    const data: any = {
-      amount,
-      project,
-      type,
-      projectId,
-      categoryId,
-      categoryName,
-      userId,
-      registeredBy,
-      description,
-      date: date || new Date(), // Usa la fecha proporcionada o la fecha actual
-      createdAt: serverTimestamp(),
-    };
-
-    // Solo incluir notes si tiene valor
-    if (notes) {
-      data.notes = notes;
-    }
-
-    if (quantity !== undefined && quantity !== null) {
-      data.quantity = quantity;
-    }
-    if (unitPrice !== undefined && unitPrice !== null) {
-      data.unitPrice = unitPrice;
-    }
-    if (activityId) {
-      data.activityId = activityId;
-      data.activityName = activityName ?? null;
-      data.stageId = stageId ?? null;
-      data.stageName = stageName ?? null;
-    }
-
-    const docRef = await addDoc(transactionsRef, data);
+    const docRef = await addDoc(transactionsRef, buildTransactionData(params));
 
     // La notificación es secundaria: si falla, la transacción YA se guardó y no
     // debe reportarse como error (el usuario reintentaría y duplicaría el movimiento).
@@ -123,10 +165,11 @@ interface UpdateTransactionParams {
   activityName?: string | null;
   stageId?: string | null;
   stageName?: string | null;
+  linkedContribution?: { id: string; description: string }; // Pago directo: aporte que debe seguir al gasto
 }
 
 export const updateTransaction = async (params: UpdateTransactionParams): Promise<void> => {
-  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName } = params;
+  const { id, amount, project, type, projectId, categoryId, categoryName, userId, updatedBy, updatedByName, description, notes, quantity, unitPrice, date, activityId, activityName, stageId, stageName, linkedContribution } = params;
 
   try {
     const transactionRef = doc(db, 'transactions', id);
@@ -141,12 +184,9 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
       userId,
       description,
       date,
+      // Los formularios siempre envían las notas: vacío significa que se borraron
+      notes: notes || deleteField(),
     };
-
-    // Solo incluir notes si tiene valor
-    if (notes) {
-      data.notes = notes;
-    }
 
     // Manejar quantity y unitPrice:
     // - Si tienen valor, guardarlos
@@ -165,7 +205,19 @@ export const updateTransaction = async (params: UpdateTransactionParams): Promis
     data.stageId      = stageId      || deleteField();
     data.stageName    = stageName    || deleteField();
 
-    await updateDoc(transactionRef, data);
+    if (linkedContribution) {
+      const batch = writeBatch(db);
+      batch.update(transactionRef, data);
+      batch.update(doc(db, 'transactions', linkedContribution.id), {
+        amount,
+        date,
+        description: linkedContribution.description,
+        notes: notes || deleteField(),
+      });
+      await batch.commit();
+    } else {
+      await updateDoc(transactionRef, data);
+    }
 
     // Notificación secundaria: no debe convertir una edición exitosa en "error"
     try {
@@ -204,6 +256,22 @@ export const bulkUpdateTransactions = async (
   await batch.commit();
 };
 
+// Vincula pagos directos antiguos. Cada par se escribe completo dentro de su
+// lote; Firestore admite 500 escrituras por lote y cada par usa 2.
+export const linkDirectPayments = async (pairs: DirectPaymentPair[]): Promise<void> => {
+  for (let i = 0; i < pairs.length; i += 200) {
+    const batch = writeBatch(db);
+    pairs.slice(i, i + 200).forEach(({ contribution, expense }) => {
+      batch.update(doc(db, 'transactions', expense.id), { linkedTransactionId: contribution.id });
+      batch.update(doc(db, 'transactions', contribution.id), {
+        linkedTransactionId: expense.id,
+        description: `${contribution.description}: ${expense.description}`,
+      });
+    });
+    await batch.commit();
+  }
+};
+
 export const bulkClearActivityFromTransactions = async (ids: string[]): Promise<void> => {
   return bulkUpdateTransactions(ids, {
     stageId: deleteField(),
@@ -219,14 +287,22 @@ interface DeleteTransactionParams {
   deletedByName: string; // Nombre del usuario que elimina
   description: string; // Descripción de la transacción eliminada
   projectName: string; // Nombre del proyecto
+  linkedTransactionId?: string; // Pago directo: la otra mitad se elimina junto con esta
 }
 
 export const deleteTransaction = async (params: DeleteTransactionParams): Promise<void> => {
-  const { id, deletedBy, deletedByName, description, projectName } = params;
+  const { id, deletedBy, deletedByName, description, projectName, linkedTransactionId } = params;
 
   try {
     const transactionRef = doc(db, 'transactions', id);
-    await deleteDoc(transactionRef);
+    if (linkedTransactionId) {
+      const batch = writeBatch(db);
+      batch.delete(transactionRef);
+      batch.delete(doc(db, 'transactions', linkedTransactionId));
+      await batch.commit();
+    } else {
+      await deleteDoc(transactionRef);
+    }
 
     // Borrar la foto del recibo asociada (si existe); no es fatal si falla
     try {
