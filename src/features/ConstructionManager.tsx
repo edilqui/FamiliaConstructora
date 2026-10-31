@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
-  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight, CalendarDays, BookOpen,
+  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight, CalendarDays, BookOpen, Calculator,
 } from 'lucide-react';
 import { useModalHistory } from '../hooks/useModalHistory';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -649,7 +649,14 @@ export default function ConstructionManager() {
             </div>
             <h1 className="text-lg font-bold text-gray-900">Avance de Obra</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigate('/obra/estimador')}
+            aria-label="Estimador de costos"
+            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <Calculator className="w-5 h-5" />
+          </button>
           <button
             onClick={() => navigate('/obra/bitacora')}
             aria-label="Bitácora de obra"

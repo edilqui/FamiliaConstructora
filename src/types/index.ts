@@ -177,6 +177,34 @@ export interface Commitment {
   periods: CommitmentPeriod[]; // Ordenados por mes
 }
 
+// --- ESTIMADOR DE COSTOS ---
+export interface EstimateItem {
+  name: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number | null; // null: se usa la última compra registrada
+}
+
+export interface Estimate {
+  id: string;
+  name: string;
+  activityId: string | null;
+  wastePercent: number;
+  laborCost: number;
+  items: EstimateItem[];
+}
+
+// --- SIMULADOR DE ARRIENDO ---
+export interface RentalScenario {
+  projectId: string;
+  totalCost: number;
+  units: number;
+  monthlyRentPerUnit: number;
+  monthlyExpensesPerUnit: number;
+  occupancyPercent: number;
+  annualIncreasePercent: number;
+}
+
 // --- CUENTAS POR PAGAR ---
 export interface Payable {
   id: string;

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Wallet, Scale, Settings, HardHat } from 'lucide-react';
+import { Home, Wallet, Scale, Settings, HardHat } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface NavItem {
@@ -11,9 +11,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/',           label: 'Inicio',      icon: Home     },
   { path: '/expenses',   label: 'Movimientos', icon: Wallet   },
-  { path: '/balance',    label: 'Balance',     icon: Scale    },
+  { path: '/balance',    label: 'Finanzas',    icon: Scale    },
   { path: '/obra',       label: 'Obra',        icon: HardHat  },
-  { path: '/statistics', label: 'Reportes',    icon: BarChart3 },
   { path: '/settings',   label: 'Ajustes',     icon: Settings },
 ];
 
@@ -27,7 +26,8 @@ export default function BottomNav() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path
-              || (item.path === '/obra' && /^\/(activity|obra)\//.test(location.pathname));
+              || (item.path === '/obra' && /^\/(activity|obra)\//.test(location.pathname))
+              || (item.path === '/balance' && location.pathname.startsWith('/finanzas/'));
 
             return (
               <Link

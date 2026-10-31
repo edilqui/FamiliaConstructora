@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import Layout from './components/Layout';
 import Dashboard from './features/Dashboard';
-import Statistics from './features/Statistics';
+import Finances from './features/Finances';
+import Estimator from './features/Estimator';
+import RentalSimulator from './features/RentalSimulator';
 import Expenses from './features/Expenses';
-import Balance from './features/Balance';
 import Settings from './features/Settings';
 import CategoriesManager from './features/CategoriesManager';
 import ProjectsManager from './features/ProjectsManager';
@@ -137,21 +138,13 @@ function App() {
           element={
             <ProtectedRoute>
               <Layout>
-                <Balance />
+                <Finances />
               </Layout>
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/statistics"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Statistics />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
+        {/* Enlaces guardados de cuando Reportes era una pestaña aparte */}
+        <Route path="/statistics" element={<Navigate to="/balance?tab=statistics" replace />} />
         <Route
           path="/settings"
           element={
@@ -258,6 +251,26 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <ActivityDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/finanzas/simulador"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <RentalSimulator />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/obra/estimador"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Estimator />
               </Layout>
             </ProtectedRoute>
           }

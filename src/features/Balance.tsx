@@ -8,7 +8,6 @@ import {
   Wallet, History, ClipboardCheck, Loader2, X, ChevronRight
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
-import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { useModalHistory } from '../hooks/useModalHistory';
 import CommitmentCard from '../components/CommitmentCard';
 import { format } from 'date-fns';
@@ -16,14 +15,13 @@ import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
 import ContributionDetail from '../components/ContributionDetail';
 import { getRunningTotals } from '../lib/contributions';
-import NotificationButton from '../components/NotificationButton';
 import AmountInput from '../components/AmountInput';
 import { addCashCount, subscribeCashCounts } from '../services/cashCountService';
 import { toast } from '../store/useToastStore';
 import type { CashCount } from '../types';
 
 export default function Balance() {
-  const { users, userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
+  const { users, userStats, memberStats, collaboratorStats, transactions, totalContributions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
 
@@ -142,7 +140,6 @@ export default function Balance() {
   // hardcodeado que no correspondía al número real de miembros)
   const recommendedContribution = amountToCatchUp;
 
-  const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   // Mientras cargan los datos: spinner. Si ya cargaron y aun así no hay stats
   // del usuario, mostramos un estado claro en vez de una espera infinita.
@@ -180,30 +177,9 @@ export default function Balance() {
       : { bg: 'bg-emerald-600', light: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
-
-      {/* --- HEADER STICKY TIPO APP --- */}
-      <header
-        ref={headerRef}
-        className={cn(
-          "fixed top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-3 lg:py-4 shadow-sm",
-          "transition-transform duration-300 ease-in-out",
-          headerHidden ? '-translate-y-full' : 'translate-y-0',
-        )}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-900 rounded-lg">
-              <Scale className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Finanzas</h1>
-          </div>
-          <NotificationButton />
-        </div>
-      </header>
-      <div style={{ height: spacerHeight }} />
-
-      <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-6 max-w-7xl mx-auto">
+    // Va dentro de la pestaña Balance de Finanzas, que pone el encabezado y los márgenes
+    <div>
+      <div className="space-y-6">
 
         {/* --- TARJETA PRINCIPAL (HERO) --- */}
         {/* Eliminamos bordes gruesos, usamos sombras suaves y gradientes sutiles */}
@@ -344,6 +320,10 @@ export default function Balance() {
 
         {/* --- RESUMEN GENERAL (Estilo Widget) --- */}
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500">Aportes de todos</span>
+            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalContributions)}</p>
+          </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 bg-purple-100 rounded-md">

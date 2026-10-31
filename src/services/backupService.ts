@@ -18,6 +18,8 @@ const COLLECTIONS_TO_BACKUP = [
   'cashCounts',
   'commitments',
   'payables',
+  'estimates',
+  'rentalScenarios',
   'siteLog',
   'siteLogPhotos',
   'notifications',

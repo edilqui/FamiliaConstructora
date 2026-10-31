@@ -12,22 +12,7 @@ import {
 } from 'recharts';
 import { format, addMonths, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-/** Normaliza descripciones para agrupar compras del mismo material */
-function materialKey(description: string): string {
-  return description
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-interface MaterialPurchase {
-  date: Date;
-  unitPrice: number;
-  quantity: number;
-}
+import { buildMaterialHistory, materialKey } from '../lib/materials';
 
 export default function AnalysisReport() {
   const { transactions, totalInBox, memberCount } = useDashboardData();
@@ -121,25 +106,7 @@ export default function AnalysisReport() {
   }, [stageComparison]);
 
   // ══════════ 3. HISTORIAL DE PRECIOS POR MATERIAL ══════════
-  const materials = useMemo(() => {
-    const map = new Map<string, { name: string; purchases: MaterialPurchase[] }>();
-    transactions.forEach(t => {
-      if (t.type === 'expense' && t.quantity && t.unitPrice) {
-        const key = materialKey(t.description);
-        if (!map.has(key)) map.set(key, { name: t.description, purchases: [] });
-        map.get(key)!.purchases.push({ date: t.date, unitPrice: t.unitPrice, quantity: t.quantity });
-      }
-    });
-    return Array.from(map.entries())
-      .map(([key, g]) => {
-        const purchases = [...g.purchases].sort((a, b) => a.date.getTime() - b.date.getTime());
-        const first = purchases[0];
-        const last = purchases[purchases.length - 1];
-        const changePct = first.unitPrice > 0 ? ((last.unitPrice - first.unitPrice) / first.unitPrice) * 100 : 0;
-        return { key, name: g.name, purchases, first, last, changePct };
-      })
-      .sort((a, b) => b.last.date.getTime() - a.last.date.getTime());
-  }, [transactions]);
+  const materials = useMemo(() => buildMaterialHistory(transactions), [transactions]);
 
   const filteredMaterials = useMemo(() => {
     if (!materialSearch) return materials;

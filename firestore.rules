@@ -78,6 +78,8 @@ service cloud.firestore {
     match /activities/{id} { allow write: if isMember(); }
     match /commitments/{id} { allow write: if isMember(); }
     match /payables/{id} { allow write: if isMember(); }
+    match /estimates/{id} { allow write: if isMember(); }
+    match /rentalScenarios/{id} { allow write: if isMember(); }
     match /siteLog/{id} { allow write: if isMember(); }
     match /siteLogPhotos/{id} { allow write: if isMember(); }
     match /receipts/{id} {
