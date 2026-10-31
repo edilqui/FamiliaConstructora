@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Wallet, Scale, Settings } from 'lucide-react';
+import { Home, BarChart3, Wallet, Scale, Settings, HardHat } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface NavItem {
@@ -12,6 +12,7 @@ const navItems: NavItem[] = [
   { path: '/',           label: 'Inicio',      icon: Home     },
   { path: '/expenses',   label: 'Movimientos', icon: Wallet   },
   { path: '/balance',    label: 'Balance',     icon: Scale    },
+  { path: '/obra',       label: 'Obra',        icon: HardHat  },
   { path: '/statistics', label: 'Reportes',    icon: BarChart3 },
   { path: '/settings',   label: 'Ajustes',     icon: Settings },
 ];
@@ -25,13 +26,14 @@ export default function BottomNav() {
         <div className="flex justify-around items-end h-16 sm:h-[4.5rem] px-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path
+              || (item.path === '/obra' && location.pathname.startsWith('/activity/'));
 
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className="flex flex-col items-center justify-end flex-1 pb-2 h-full pt-1 transition-colors"
+                className="flex flex-col items-center justify-end flex-1 min-w-0 pb-2 h-full pt-1 transition-colors"
               >
                 {/* Pill del ícono activo */}
                 <div className={cn(
@@ -50,7 +52,7 @@ export default function BottomNav() {
 
                 {/* Label */}
                 <span className={cn(
-                  'text-[10px] sm:text-xs font-medium leading-tight transition-colors duration-200',
+                  'max-w-full truncate text-[10px] sm:text-xs font-medium leading-tight transition-colors duration-200',
                   isActive ? 'text-emerald-700 font-semibold' : 'text-gray-400',
                 )}>
                   {item.label}

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'; // <--- 1. Importar esto
-import { Bell, X, Trash2, CheckCheck } from 'lucide-react';
+import { Bell, X, CheckCheck } from 'lucide-react';
 import { useNotifications } from '../hooks/useNotifications';
 import { formatCurrency } from '../lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -136,9 +136,10 @@ export default function NotificationPanel({ isOpen, onClose }: NotificationPanel
 
                     <button
                       onClick={() => markAsRead(notification.id)}
-                      className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600"
+                      aria-label="Descartar aviso"
+                      className="flex-shrink-0 lg:opacity-0 lg:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
                 </div>

@@ -241,7 +241,7 @@ export default function Balance() {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider opacity-70">
-                  Tu Cuota (1/{memberCount || 4})
+                  Tu parte de lo gastado (1/{memberCount || 4})
                 </p>
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.share)}</p>
               </div>
@@ -257,7 +257,7 @@ export default function Balance() {
             </div>
             <div>
               <h3 className="font-bold text-gray-800">Meta de Aportes</h3>
-              <p className="text-xs text-gray-500">Basado en presupuestos totales</p>
+              <p className="text-xs text-gray-500">Tu parte del presupuesto total (1/{memberCount || 4})</p>
             </div>
           </div>
 

@@ -183,7 +183,7 @@ export default function Statistics() {
                   <TrendingUp className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Ingresos Totales</p>
+                  <p className="text-xs text-gray-500 font-medium">Aportes Totales</p>
                   <p className="text-lg font-bold text-gray-900">{formatCurrency(totalContributions)}</p>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export default function Statistics() {
                         </div>
                         <div>
                           <p className="font-semibold text-gray-900 text-sm">{stat.userName}</p>
-                          <p className="text-xs text-gray-400">Cuota: {formatCurrency(stat.share)}</p>
+                          <p className="text-xs text-gray-400">Parte de lo gastado: {formatCurrency(stat.share)}</p>
                         </div>
                       </div>
 

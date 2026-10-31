@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
-  DollarSign, PauseCircle, LayoutList, ArrowLeft,
+  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight,
 } from 'lucide-react';
 import { useModalHistory } from '../hooks/useModalHistory';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -90,7 +90,7 @@ export default function ConstructionManager() {
   const navigate = useNavigate();
   const canEdit = useAuthStore((state) => state.user?.role !== 'collaborator');
   const { stages, activities, loading } = useConstructionData();
-  const { projects, transactions } = useDashboardData();
+  const { projects, transactions, loading: dataLoading } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('gestion');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -118,7 +118,7 @@ export default function ConstructionManager() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // El atrás del sistema cierra los modales en lugar de salir de la pantalla
-  const goBack = useSmartBack('/settings');
+  const goBack = useSmartBack('/');
   useModalHistory(showStageModal, () => setShowStageModal(false));
   useModalHistory(showActivityModal, () => setShowActivityModal(false));
   useModalHistory(deletingStageId !== null, () => setDeletingStageId(null));
@@ -429,6 +429,7 @@ export default function ConstructionManager() {
           >
             <HardHat className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
             <span className="text-sm font-medium text-gray-800 truncate">{activity.name}</span>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </button>
           <div className="flex items-center gap-1 flex-shrink-0">
             <StatusBadge status={activity.status} type="activity" />
@@ -702,7 +703,7 @@ export default function ConstructionManager() {
         </div>
 
         {/* Content */}
-        {loading ? (
+        {loading || dataLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>

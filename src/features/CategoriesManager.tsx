@@ -176,6 +176,7 @@ export default function CategoriesManager() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!formData.name.trim()) return showFeedback('El nombre es requerido', 'error');
 
     setLoading(true);
@@ -212,7 +213,7 @@ export default function CategoriesManager() {
   const handleDelete = (category: Category) => setCategoryToDelete(category);
 
   const confirmDelete = async () => {
-    if (!categoryToDelete) return;
+    if (!categoryToDelete || loading) return;
     setLoading(true);
     try {
       const result = await deleteCategory(categoryToDelete.id);

@@ -21,9 +21,10 @@ interface TransactionFormProps {
   onClose: () => void;
   defaultProjectId?: string;
   transactionToEdit?: Transaction;
+  defaultActivity?: { id: string; name: string; stageId: string; stageName: string };
 }
 
-export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit }: TransactionFormProps) {
+export default function TransactionForm({ onClose, defaultProjectId, transactionToEdit, defaultActivity }: TransactionFormProps) {
   const { projects, categories, totalInBox, users, transactions, loading: dataLoading } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const user = useAuthStore((state) => state.user);
@@ -55,11 +56,11 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
   const [showCalculator, setShowCalculator] = useState(false);
 
   // Actividad de obra (opcional)
-  const [showActivitySelector, setShowActivitySelector] = useState(false);
-  const [selectedStageId, setSelectedStageId] = useState('');
-  const [selectedStageName, setSelectedStageName] = useState('');
-  const [selectedActivityId, setSelectedActivityId] = useState('');
-  const [selectedActivityName, setSelectedActivityName] = useState('');
+  const [showActivitySelector, setShowActivitySelector] = useState(!!defaultActivity);
+  const [selectedStageId, setSelectedStageId] = useState(defaultActivity?.stageId ?? '');
+  const [selectedStageName, setSelectedStageName] = useState(defaultActivity?.stageName ?? '');
+  const [selectedActivityId, setSelectedActivityId] = useState(defaultActivity?.id ?? '');
+  const [selectedActivityName, setSelectedActivityName] = useState(defaultActivity?.name ?? '');
 
   // Modo detallado (cantidad × valor unitario)
   const [detailedMode, setDetailedMode] = useState(false);
@@ -209,6 +210,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     if (!user) return setError('Debes iniciar sesión');

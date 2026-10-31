@@ -20,7 +20,7 @@ export const addAuditEntry = (batch: WriteBatch, entry: NewAuditEntry): void => 
   });
 };
 
-export const subscribeAuditLog = (maxEntries: number, callback: (entries: AuditEntry[]) => void) => {
+export const subscribeAuditLog = (maxEntries: number, callback: (entries: AuditEntry[]) => void, onError: () => void) => {
   const q = query(collection(db, AUDIT_COLLECTION), orderBy('createdAt', 'desc'), limit(maxEntries));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map((d) => ({
@@ -28,5 +28,8 @@ export const subscribeAuditLog = (maxEntries: number, callback: (entries: AuditE
       id: d.id,
       createdAt: d.data().createdAt?.toDate() ?? new Date(),
     })));
+  }, (error) => {
+    console.error('Error al cargar el registro de cambios:', error);
+    onError();
   });
 };

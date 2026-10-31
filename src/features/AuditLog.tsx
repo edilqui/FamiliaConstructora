@@ -50,7 +50,9 @@ export default function AuditLog() {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [maxEntries, setMaxEntries] = useState(PAGE_SIZE);
 
-  useEffect(() => subscribeAuditLog(maxEntries, setEntries), [maxEntries]);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => subscribeAuditLog(maxEntries, setEntries, () => setLoadFailed(true)), [maxEntries]);
 
   const formatValue = (change: AuditChange, value: AuditChange['from']): string => {
     if (value === null) return '—';
@@ -93,7 +95,9 @@ export default function AuditLog() {
       <div style={{ height: spacerHeight }} />
 
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 space-y-3 max-w-4xl mx-auto">
-        {entries === null ? (
+        {loadFailed ? (
+          <p className="text-center text-sm text-red-600 py-12">No se pudo cargar el registro. Revisa tu conexión y vuelve a intentarlo.</p>
+        ) : entries === null ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>

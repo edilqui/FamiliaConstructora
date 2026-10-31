@@ -1,15 +1,19 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
 import {
-  ArrowLeft, HardHat, Tag, ArrowDownCircle, Receipt, Loader2,
+  ArrowLeft, HardHat, Tag, ArrowDownCircle, Receipt, Loader2, Minus, ChevronRight,
 } from 'lucide-react';
 import { cn, formatCurrency, formatShort } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import TransactionForm from './TransactionForm';
+import { useAuthStore } from '../store/useAuthStore';
+import { toast } from '../store/useToastStore';
+import type { Transaction } from '../types';
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
 
@@ -17,8 +21,12 @@ export default function ActivityDetail() {
   const { activityId } = useParams<{ activityId: string }>();
   const navigate = useNavigate();
   const goBack = useSmartBack('/obra');
-  const { transactions, categories } = useDashboardData();
-  const { stages, activities, loading } = useConstructionData();
+  const { transactions, categories, loading: dataLoading } = useDashboardData();
+  const { stages, activities, loading: constructionLoading } = useConstructionData();
+  const loading = dataLoading || constructionLoading;
+  const canEdit = useAuthStore((state) => state.user?.role !== 'collaborator');
+  const [showNewExpense, setShowNewExpense] = useState(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<Transaction | null>(null);
 
   const activity = activities.find(a => a.id === activityId);
   const stage = activity ? stages.find(s => s.id === activity.stageId) : null;
@@ -58,8 +66,8 @@ export default function ActivityDetail() {
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
-  // Evita el flash de "no encontrada" mientras los datos aún cargan
-  if (loading && !activity) {
+  // Evita el flash de "no encontrada" o de $0 gastado mientras los datos aún cargan
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -231,9 +239,13 @@ export default function ActivityDetail() {
                       </h4>
                       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
                         {items.map(t => (
-                          <div
+                          <button
                             key={t.id}
-                            className="p-3.5 flex items-center gap-3"
+                            onClick={() => {
+                              if (canEdit) setExpenseToEdit(t);
+                              else toast('Solo un miembro puede modificar los gastos', { type: 'info' });
+                            }}
+                            className="w-full text-left p-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
                           >
                             <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
                               <ArrowDownCircle className="w-5 h-5" />
@@ -262,7 +274,8 @@ export default function ActivityDetail() {
                                   : format(t.date, 'HH:mm')}
                               </p>
                             </div>
-                          </div>
+                            {canEdit && <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -273,6 +286,26 @@ export default function ActivityDetail() {
         )}
 
       </div>
+
+      {canEdit && (
+        <button
+          onClick={() => setShowNewExpense(true)}
+          className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+        >
+          <Minus className="w-6 h-6" />
+          <span className="font-medium text-sm pr-1">Gasto</span>
+        </button>
+      )}
+
+      {showNewExpense && (
+        <TransactionForm
+          onClose={() => setShowNewExpense(false)}
+          defaultActivity={{ id: activity.id, name: activity.name, stageId: activity.stageId, stageName: stage?.name ?? '' }}
+        />
+      )}
+      {expenseToEdit && (
+        <TransactionForm onClose={() => setExpenseToEdit(null)} transactionToEdit={expenseToEdit} />
+      )}
     </div>
   );
 }

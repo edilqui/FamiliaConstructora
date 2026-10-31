@@ -102,6 +102,7 @@ export default function ContributionForm({ onClose, transactionToEdit }: Contrib
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     if (isLocked) return;

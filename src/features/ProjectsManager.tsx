@@ -119,6 +119,7 @@ export default function ProjectsManager() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!formData.name.trim()) return showFeedback('Nombre requerido', 'error');
 
     setLoading(true);
@@ -144,7 +145,7 @@ export default function ProjectsManager() {
   const handleDelete = (project: Project) => setProjectToDelete(project);
 
   const confirmDelete = async () => {
-    if (!projectToDelete) return;
+    if (!projectToDelete || loading) return;
     setLoading(true);
     try {
       const result = await deleteProject(projectToDelete.id);

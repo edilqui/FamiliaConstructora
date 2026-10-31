@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { User, Project, Category, Transaction, DashboardData, UserStats, ProjectStats } from '../types';
+import { toast } from '../store/useToastStore';
+
+// Al cerrar sesión Firestore corta las suscripciones: eso no es un error para el usuario
+const notifyLoadError = () => {
+  if (auth.currentUser) toast('No se pudieron cargar los datos. Revisa tu conexión y vuelve a abrir la app.', { type: 'error' });
+};
 
 export const useDashboardData = (): DashboardData & { loading: boolean } => {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [transactionsLoaded, setTransactionsLoaded] = useState(false);
 
   useEffect(() => {
     // Suscribirse a usuarios
     const usersQuery = query(collection(db, 'users'));
-    const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
+    // Con la caché vacía la primera respuesta llega sin datos: no significa que no haya
+    const unsubUsers = onSnapshot(usersQuery, { includeMetadataChanges: true }, (snapshot) => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       const usersData = snapshot.docs.map((doc) => ({
         ...doc.data(),
         id: doc.id,
@@ -21,6 +30,10 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
       // Los pendientes de aprobación no cuentan para cuotas, saldos ni listas.
       // Sin el campo `approved` es un usuario antiguo, que se considera aprobado.
       setUsers(usersData.filter((u) => u.approved !== false));
+      setUsersLoaded(true);
+    }, (error) => {
+      console.error('Error al cargar usuarios:', error);
+      notifyLoadError();
     });
 
     // Suscribirse a proyectos
@@ -55,7 +68,8 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
 
     // Suscribirse a transacciones
     const transactionsQuery = query(collection(db, 'transactions'));
-    const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+    const unsubTransactions = onSnapshot(transactionsQuery, { includeMetadataChanges: true }, (snapshot) => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       const transactionsData = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
@@ -66,7 +80,10 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
         };
       }) as Transaction[];
       setTransactions(transactionsData);
-      setLoading(false);
+      setTransactionsLoaded(true);
+    }, (error) => {
+      console.error('Error al cargar movimientos:', error);
+      notifyLoadError();
     });
 
     return () => {
@@ -169,6 +186,6 @@ export const useDashboardData = (): DashboardData & { loading: boolean } => {
     collaboratorStats,
     memberCount,
     projectStats,
-    loading,
+    loading: !usersLoaded || !transactionsLoaded,
   };
 };
