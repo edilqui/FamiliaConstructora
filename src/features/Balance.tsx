@@ -13,6 +13,8 @@ import { useModalHistory } from '../hooks/useModalHistory';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
+import ContributionDetail from '../components/ContributionDetail';
+import { getRunningTotals } from '../lib/contributions';
 import NotificationButton from '../components/NotificationButton';
 import AmountInput from '../components/AmountInput';
 import { addCashCount, subscribeCashCounts } from '../services/cashCountService';
@@ -20,7 +22,7 @@ import { toast } from '../store/useToastStore';
 import type { CashCount } from '../types';
 
 export default function Balance() {
-  const { userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
+  const { users, userStats, memberStats, collaboratorStats, transactions, totalExpenses, totalInBox, projects, memberCount, loading } = useDashboardData();
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
 
@@ -29,6 +31,7 @@ export default function Balance() {
 
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<typeof transactions[0] | undefined>(undefined);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const handleEditContribution = (contribution: typeof transactions[0]) => {
     setTransactionToEdit(contribution);
@@ -90,6 +93,9 @@ export default function Balance() {
   }, [transactions, user]);
 
   const userContributions = allUserContributions.slice(0, 10);
+  const runningTotals = useMemo(() => getRunningTotals(allUserContributions), [allUserContributions]);
+  // Se busca por id para que el detalle refleje ediciones y se cierre si el aporte se elimina
+  const detailContribution = allUserContributions.find((c) => c.id === detailId);
 
   const amountToCatchUp = useMemo(() => {
     if (!currentUserStats) return 0;
@@ -563,7 +569,7 @@ export default function Balance() {
                   {userContributions.map((contribution) => (
                     <button
                       key={contribution.id}
-                      onClick={() => handleEditContribution(contribution)}
+                      onClick={() => setDetailId(contribution.id)}
                       className="w-full p-3 lg:px-4 lg:py-3 flex lg:grid lg:grid-cols-[auto_1fr_200px_140px] items-center gap-3 lg:gap-4 hover:bg-gray-50 transition-colors text-left"
                     >
                       {/* Icono */}
@@ -576,7 +582,7 @@ export default function Balance() {
                         <p className="text-sm font-medium text-gray-800 truncate">{contribution.description}</p>
                         {/* Fecha solo en móvil */}
                         <p className="text-xs text-gray-400 lg:hidden">
-                          {format(contribution.date, "d MMM • HH:mm", { locale: es })}
+                          {format(contribution.date, "d MMM yyyy • HH:mm", { locale: es })}
                         </p>
                       </div>
 
@@ -599,6 +605,17 @@ export default function Balance() {
           </div>
         </div>
       </div>
+
+      {/* Detalle de solo lectura; queda debajo del formulario al editar */}
+      {detailContribution && (
+        <ContributionDetail
+          contribution={detailContribution}
+          runningTotal={runningTotals.get(detailContribution.id)}
+          registeredByName={users.find((u) => u.id === detailContribution.registeredBy)?.name}
+          onClose={() => setDetailId(null)}
+          onEdit={() => handleEditContribution(detailContribution)}
+        />
+      )}
 
       {/* Modal de edición de contribución */}
       {showContributionForm && (

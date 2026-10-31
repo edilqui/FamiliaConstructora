@@ -38,6 +38,28 @@ export function buildTransactionsCsv(transactions: Transaction[]): string {
   return '﻿' + [header, ...rows].join('\r\n');
 }
 
+export interface ContributionStatementRow {
+  contribution: Transaction;
+  runningTotal: number;
+  registeredByName: string;
+}
+
+export function buildContributionStatementCsv(rows: ContributionStatementRow[]): string {
+  const header = ['Fecha', 'Hora', 'Descripción', 'Monto', 'Acumulado', 'Registrado por', 'Notas'].join(SEP);
+
+  const lines = rows.map(({ contribution: c, runningTotal, registeredByName }) => [
+    csvCell(format(c.date, 'yyyy-MM-dd')),
+    csvCell(format(c.date, 'HH:mm')),
+    csvCell(c.description),
+    csvCell(c.amount),
+    csvCell(runningTotal),
+    csvCell(registeredByName),
+    csvCell(c.notes ?? ''),
+  ].join(SEP));
+
+  return '﻿' + [header, ...lines].join('\r\n');
+}
+
 export function downloadCsv(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
