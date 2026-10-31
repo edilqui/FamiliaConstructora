@@ -12,7 +12,6 @@ import {
   HardDrive,
   Building2,
   Dices,
-  Link2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -92,13 +91,6 @@ export default function Settings() {
       icon: HardDrive,
       path: '/settings/backup',
       color: 'bg-blue-500',
-    },
-    {
-      id: 'direct-payments',
-      label: 'Revisar Pagos Directos',
-      icon: Link2,
-      path: '/settings/direct-payments',
-      color: 'bg-indigo-500',
     },
     // Solo visible para miembros (no colaboradores)
     ...(user?.role === 'member'

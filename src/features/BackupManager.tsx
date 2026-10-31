@@ -28,7 +28,10 @@ import {
   readBackupFile,
   importBackupData,
   canShareFiles,
-  BackupData
+  validateBackup,
+  getMissingCollections,
+  BackupData,
+  ImportResult
 } from '../services/backupService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -50,13 +53,23 @@ export default function BackupManager() {
   const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
   const [importError, setImportError] = useState<string>('');
   const [backupToImport, setBackupToImport] = useState<BackupData | null>(null);
-  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   // Modal de confirmación
   const [showImportConfirm, setShowImportConfirm] = useState(false);
 
+  // Copia de los datos actuales, obligatoria antes de restaurar
+  const [safetyBackup, setSafetyBackup] = useState<BackupData | null>(null);
+  const [safetyStatus, setSafetyStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+
+  const closeImportConfirm = () => {
+    setShowImportConfirm(false);
+    setSafetyBackup(null);
+    setSafetyStatus('idle');
+  };
+
   // El atrás del sistema cierra la confirmación en lugar de salir de la pantalla
-  useModalHistory(showImportConfirm, () => setShowImportConfirm(false));
+  useModalHistory(showImportConfirm, closeImportConfirm);
 
   const canShare = canShareFiles();
 
@@ -112,6 +125,8 @@ export default function BackupManager() {
 
     try {
       const backup = await readBackupFile(file);
+      const problem = user ? validateBackup(backup, user.id) : 'Debes iniciar sesión';
+      if (problem) throw new Error(problem);
       setBackupToImport(backup);
       setImportStatus('preview');
     } catch (error) {
@@ -123,17 +138,33 @@ export default function BackupManager() {
     e.target.value = '';
   };
 
+  // --- GUARDAR COPIA DE LOS DATOS ACTUALES ---
+  const handleSaveSafetyBackup = async () => {
+    if (!user) return;
+
+    setSafetyStatus('saving');
+
+    try {
+      const backup = await exportAllData(user.id, user.name, user.email);
+      const fileName = `Antes_de_restaurar_${generateBackupFileName()}`;
+      const shared = canShare && await shareBackupFile(backup, fileName);
+      if (!shared) downloadBackupFile(backup, fileName);
+      setSafetyBackup(backup);
+      setSafetyStatus('idle');
+    } catch {
+      setSafetyStatus('error');
+    }
+  };
+
   // --- CONFIRMAR IMPORTACIÓN ---
   const handleConfirmImport = async () => {
-    if (!backupToImport) return;
+    if (!backupToImport || !safetyBackup || !user) return;
 
     setShowImportConfirm(false);
     setImportStatus('importing');
 
     try {
-      const result = await importBackupData(backupToImport, {
-        clearExisting: true // Sobrescribir datos existentes
-      });
+      const result = await importBackupData(backupToImport, user.id);
 
       setImportResult(result);
       setImportStatus(result.success ? 'success' : 'error');
@@ -162,6 +193,8 @@ export default function BackupManager() {
     setImportError('');
     setBackupToImport(null);
     setImportResult(null);
+    setSafetyBackup(null);
+    setSafetyStatus('idle');
   };
 
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
@@ -214,7 +247,7 @@ export default function BackupManager() {
             {exportStatus === 'idle' && (
               <>
                 <p className="text-sm text-gray-600 mb-4">
-                  Se exportarán: usuarios, proyectos, categorías, transacciones, notificaciones y tareas.
+                  Se exportarán: usuarios, proyectos, categorías, movimientos, etapas, actividades, recibos, arqueos, notificaciones, tareas y partidas.
                 </p>
                 <button
                   onClick={handleExport}
@@ -344,8 +377,8 @@ export default function BackupManager() {
                   <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs text-amber-700">
-                      <strong>Importante:</strong> Restaurar un backup reemplazará todos los datos actuales.
-                      Asegúrate de tener un backup reciente antes de continuar.
+                      <strong>Importante:</strong> Restaurar un backup reemplazará los datos actuales.
+                      Antes de hacerlo, la app te pedirá guardar una copia de lo que hay hoy.
                     </p>
                   </div>
                 </div>
@@ -396,6 +429,15 @@ export default function BackupManager() {
                   </div>
                 </div>
 
+                {getMissingCollections(backupToImport).length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      Este backup no incluye: <strong>{getMissingCollections(backupToImport).join(', ')}</strong>. Esos datos se conservarán como están hoy.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={handleCancelImport}
@@ -428,7 +470,7 @@ export default function BackupManager() {
                   <div>
                     <p className="text-sm font-semibold text-emerald-800">Restauración completada</p>
                     <p className="text-xs text-emerald-600 mt-1">
-                      {importResult.imported} documentos importados
+                      {importResult.imported} documentos restaurados · {importResult.deleted} eliminados
                     </p>
                   </div>
                 </div>
@@ -475,7 +517,7 @@ export default function BackupManager() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">•</span>
-              <span>Los backups incluyen toda la información de la app</span>
+              <span>Los backups incluyen toda la información de la app, también las fotos de recibos, así que el archivo puede pesar varios MB</span>
             </li>
           </ul>
         </div>
@@ -488,7 +530,7 @@ export default function BackupManager() {
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/50"
-            onClick={() => setShowImportConfirm(false)}
+            onClick={closeImportConfirm}
           />
 
           {/* Modal */}
@@ -507,25 +549,50 @@ export default function BackupManager() {
                 ¿Confirmar restauración?
               </h3>
 
-              <p className="text-sm text-gray-500 mb-6">
-                Esta acción <strong>reemplazará todos los datos actuales</strong> con los del backup.
-                Este proceso no se puede deshacer.
+              <p className="text-sm text-gray-500 mb-4">
+                Esta acción <strong>reemplazará los datos actuales</strong> con los del backup. Pide a los demás que no registren nada mientras tanto.
               </p>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowImportConfirm(false)}
-                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmImport}
-                  className="flex-1 px-4 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors"
-                >
-                  Sí, Restaurar
-                </button>
-              </div>
+              <button
+                onClick={handleSaveSafetyBackup}
+                disabled={safetyStatus === 'saving' || !!safetyBackup}
+                className="w-full mb-2 px-4 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {safetyStatus === 'saving' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : safetyBackup ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {safetyBackup ? 'Copia de hoy creada' : '1. Guardar copia de hoy'}
+              </button>
+
+              {safetyBackup && (
+                <p className="text-xs text-gray-500 mb-2">
+                  Confirma que el archivo quedó guardado en tu equipo antes de continuar.
+                </p>
+              )}
+              {safetyStatus === 'error' && (
+                <p className="text-xs text-red-600 mb-2">
+                  No se pudo crear la copia. No se cambió ningún dato; intenta de nuevo.
+                </p>
+              )}
+
+              <button
+                onClick={handleConfirmImport}
+                disabled={!safetyBackup}
+                className="w-full mb-3 px-4 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors disabled:opacity-40"
+              >
+                2. Sí, Restaurar
+              </button>
+
+              <button
+                onClick={closeImportConfirm}
+                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

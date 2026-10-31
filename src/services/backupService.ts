@@ -1,16 +1,25 @@
-import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-// Colecciones a respaldar
+// Colecciones a respaldar. Toda colección nueva de la app debe agregarse aquí.
 const COLLECTIONS_TO_BACKUP = [
   'users',
   'projects',
   'categories',
   'transactions',
+  'stages',
+  'activities',
+  'receipts',
+  'cashCounts',
   'notifications',
   'tasks',
   'brassGames'
 ];
+
+const BACKUP_VERSION = '2.0';
+// Firestore limita cada lote en documentos y en bytes; los recibos pesan hasta ~700 KB
+const MAX_BATCH_DOCS = 400;
+const MAX_BATCH_BYTES = 5 * 1024 * 1024;
 
 export interface BackupData {
   version: string;
@@ -40,7 +49,7 @@ export interface BackupData {
  */
 export async function exportAllData(userId: string, userName: string, userEmail: string): Promise<BackupData> {
   const backup: BackupData = {
-    version: '1.0',
+    version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
     createdBy: {
       userId,
@@ -62,12 +71,10 @@ export async function exportAllData(userId: string, userName: string, userEmail:
       const documents: Array<{ id: string; data: Record<string, unknown> }> = [];
 
       snapshot.forEach((doc) => {
-        const data = doc.data();
-        // Convertir Timestamps a ISO strings para serialización
-        const serializedData = serializeFirestoreData(data);
         documents.push({
           id: doc.id,
-          data: serializedData
+          // Convertir Timestamps a ISO strings para serialización
+          data: serializeValue(doc.data()) as Record<string, unknown>
         });
       });
 
@@ -78,12 +85,9 @@ export async function exportAllData(userId: string, userName: string, userEmail:
 
       backup.metadata.totalDocuments += documents.length;
     } catch (error) {
+      // Una copia incompleta no debe presentarse como exitosa
       console.error(`Error al exportar colección ${collectionName}:`, error);
-      // Continuar con las demás colecciones
-      backup.collections[collectionName] = {
-        count: 0,
-        documents: []
-      };
+      throw new Error(`No se pudo leer "${collectionName}". La copia no se creó; intenta de nuevo.`);
     }
   }
 
@@ -91,63 +95,28 @@ export async function exportAllData(userId: string, userName: string, userEmail:
 }
 
 /**
- * Serializa datos de Firestore para JSON (convierte Timestamps, etc.)
+ * Serializa un valor de Firestore para JSON (convierte Timestamps, etc.)
  */
-function serializeFirestoreData(data: Record<string, unknown>): Record<string, unknown> {
-  const serialized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) {
-      serialized[key] = value;
-    } else if (value instanceof Date) {
-      serialized[key] = { _type: 'date', value: value.toISOString() };
-    } else if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-      // Es un Timestamp de Firestore
-      serialized[key] = { _type: 'timestamp', value: (value as { toDate: () => Date }).toDate().toISOString() };
-    } else if (Array.isArray(value)) {
-      serialized[key] = value.map(item =>
-        typeof item === 'object' && item !== null
-          ? serializeFirestoreData(item as Record<string, unknown>)
-          : item
-      );
-    } else if (typeof value === 'object') {
-      serialized[key] = serializeFirestoreData(value as Record<string, unknown>);
-    } else {
-      serialized[key] = value;
-    }
+function serializeValue(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (value instanceof Date) return { _type: 'date', value: value.toISOString() };
+  if ('toDate' in value && typeof value.toDate === 'function') {
+    // Es un Timestamp de Firestore
+    return { _type: 'timestamp', value: (value as { toDate: () => Date }).toDate().toISOString() };
   }
-
-  return serialized;
+  if (Array.isArray(value)) return value.map(serializeValue);
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeValue(item)]));
 }
 
 /**
- * Deserializa datos de JSON a formato Firestore
+ * Deserializa un valor de JSON a formato Firestore
  */
-function deserializeFirestoreData(data: Record<string, unknown>): Record<string, unknown> {
-  const deserialized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) {
-      deserialized[key] = value;
-    } else if (typeof value === 'object' && value !== null) {
-      const obj = value as Record<string, unknown>;
-      if (obj._type === 'date' || obj._type === 'timestamp') {
-        deserialized[key] = new Date(obj.value as string);
-      } else if (Array.isArray(value)) {
-        deserialized[key] = value.map(item =>
-          typeof item === 'object' && item !== null
-            ? deserializeFirestoreData(item as Record<string, unknown>)
-            : item
-        );
-      } else {
-        deserialized[key] = deserializeFirestoreData(obj);
-      }
-    } else {
-      deserialized[key] = value;
-    }
-  }
-
-  return deserialized;
+function deserializeValue(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(deserializeValue);
+  const obj = value as Record<string, unknown>;
+  if (obj._type === 'date' || obj._type === 'timestamp') return new Date(obj.value as string);
+  return Object.fromEntries(Object.entries(obj).map(([key, item]) => [key, deserializeValue(item)]));
 }
 
 /**
@@ -235,65 +204,134 @@ export async function readBackupFile(file: File): Promise<BackupData> {
 }
 
 /**
- * Importa datos de un backup a Firestore
- * ADVERTENCIA: Esto sobrescribirá datos existentes
+ * Colecciones que el backup realmente trae. Las copias 1.0 guardaban una
+ * colección vacía cuando fallaba su lectura, así que ahí "vacía" no significa
+ * que no hubiera datos: se trata como no incluida para no borrar nada por error.
  */
-export async function importBackupData(
-  backup: BackupData,
-  options: {
-    clearExisting?: boolean;
-    collectionsToImport?: string[];
-  } = {}
-): Promise<{ success: boolean; imported: number; errors: string[] }> {
-  const { clearExisting = false, collectionsToImport = COLLECTIONS_TO_BACKUP } = options;
-  const errors: string[] = [];
-  let imported = 0;
+export function getIncludedCollections(backup: BackupData): string[] {
+  return COLLECTIONS_TO_BACKUP.filter((name) => {
+    const data = backup.collections[name];
+    return !!data && (backup.version !== '1.0' || data.documents.length > 0);
+  });
+}
 
-  for (const collectionName of collectionsToImport) {
-    const collectionData = backup.collections[collectionName];
+export function getMissingCollections(backup: BackupData): string[] {
+  const included = getIncludedCollections(backup);
+  return COLLECTIONS_TO_BACKUP.filter((name) => !included.includes(name));
+}
 
-    if (!collectionData) {
-      continue;
+/**
+ * Revisa el archivo completo antes de tocar cualquier dato.
+ * Devuelve el problema encontrado, o null si se puede restaurar.
+ */
+export function validateBackup(backup: BackupData, currentUserId: string): string | null {
+  for (const [name, data] of Object.entries(backup.collections)) {
+    if (!Array.isArray(data?.documents) || data.documents.length !== data.count) {
+      return `El archivo está incompleto o dañado (${name}).`;
     }
+    const invalid = data.documents.some((d) =>
+      typeof d?.id !== 'string' || !d.id || d.id.includes('/') ||
+      d.data === null || typeof d.data !== 'object' || Array.isArray(d.data)
+    );
+    if (invalid) return `El archivo tiene documentos inválidos (${name}).`;
+  }
 
+  // Sin esto, restaurar dejaría sin acceso a quien lo está haciendo
+  const me = backup.collections.users?.documents?.find((d) => d.id === currentUserId);
+  if (!me || me.data.approved === false) {
+    return 'Tu usuario no aparece aprobado en este backup. Restaurarlo te dejaría sin acceso.';
+  }
+  return null;
+}
+
+export interface ImportResult {
+  success: boolean;
+  imported: number;
+  deleted: number;
+  errors: string[];
+}
+
+/**
+ * Reemplaza los datos actuales por los del backup, sin perder nada si falla:
+ * 1. Escribe todos los documentos del backup.
+ * 2. Solo si todo se escribió, borra lo que no estaba en el backup.
+ * Las colecciones que el backup no trae no se tocan. `users` se limpia de
+ * último y nunca se borra al usuario actual: sin su documento, las reglas de
+ * Firestore le negarían cualquier otra escritura.
+ */
+export async function importBackupData(backup: BackupData, currentUserId: string): Promise<ImportResult> {
+  const problem = validateBackup(backup, currentUserId);
+  if (problem) return { success: false, imported: 0, deleted: 0, errors: [problem] };
+
+  const included = getIncludedCollections(backup);
+  let imported = 0;
+  let deleted = 0;
+
+  for (const collectionName of included) {
     try {
-      // Opcionalmente limpiar la colección existente
-      if (clearExisting) {
-        const existingDocs = await getDocs(collection(db, collectionName));
-        const batch = writeBatch(db);
-        existingDocs.forEach((docSnapshot) => {
-          batch.delete(docSnapshot.ref);
-        });
-        await batch.commit();
-      }
+      let batch = writeBatch(db);
+      let batchDocs = 0;
+      let batchBytes = 0;
 
-      // Importar documentos en batches de 500 (límite de Firestore)
-      const BATCH_SIZE = 500;
-      const documents = collectionData.documents;
+      for (const docData of backup.collections[collectionName].documents) {
+        const data = deserializeValue(docData.data) as Record<string, unknown>;
+        const bytes = JSON.stringify(docData.data).length;
 
-      for (let i = 0; i < documents.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        const batchDocs = documents.slice(i, i + BATCH_SIZE);
-
-        for (const docData of batchDocs) {
-          const docRef = doc(db, collectionName, docData.id);
-          const deserializedData = deserializeFirestoreData(docData.data);
-          batch.set(docRef, deserializedData);
+        if (batchDocs > 0 && (batchDocs >= MAX_BATCH_DOCS || batchBytes + bytes > MAX_BATCH_BYTES)) {
+          await batch.commit();
+          imported += batchDocs;
+          batch = writeBatch(db);
+          batchDocs = 0;
+          batchBytes = 0;
         }
 
+        batch.set(doc(db, collectionName, docData.id), data);
+        batchDocs++;
+        batchBytes += bytes;
+      }
+
+      if (batchDocs > 0) {
         await batch.commit();
-        imported += batchDocs.length;
+        imported += batchDocs;
       }
     } catch (error) {
-      errors.push(`Error en ${collectionName}: ${(error as Error).message}`);
+      return {
+        success: false,
+        imported,
+        deleted,
+        errors: [`Error en ${collectionName}: ${(error as Error).message}. No se eliminó ningún dato; puedes intentar de nuevo.`]
+      };
     }
   }
 
-  return {
-    success: errors.length === 0,
-    imported,
-    errors
-  };
+  const deleteOrder = [...included.filter((name) => name !== 'users'), ...included.filter((name) => name === 'users')];
+
+  for (const collectionName of deleteOrder) {
+    try {
+      const keep = new Set(backup.collections[collectionName].documents.map((d) => d.id));
+      const existing = await getDocs(collection(db, collectionName));
+      const toDelete = existing.docs.filter((d) =>
+        !keep.has(d.id) && !(collectionName === 'users' && d.id === currentUserId)
+      );
+
+      for (let i = 0; i < toDelete.length; i += MAX_BATCH_DOCS) {
+        const batch = writeBatch(db);
+        const chunk = toDelete.slice(i, i + MAX_BATCH_DOCS);
+        chunk.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        deleted += chunk.length;
+      }
+    } catch (error) {
+      return {
+        success: false,
+        imported,
+        deleted,
+        errors: [`Los datos del backup se escribieron, pero falló la limpieza de ${collectionName}: ${(error as Error).message}. Puedes intentar de nuevo.`]
+      };
+    }
+  }
+
+  return { success: true, imported, deleted, errors: [] };
 }
 
 /**

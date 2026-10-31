@@ -3,7 +3,6 @@ import { db } from '../config/firebase';
 import { TransactionType } from '../types';
 import { createNotification } from './notificationService';
 import { deleteReceipt } from './receiptService';
-import type { DirectPaymentPair } from '../lib/directPayments';
 
 interface AddTransactionParams {
   amount: number;
@@ -254,22 +253,6 @@ export const bulkUpdateTransactions = async (
   const batch = writeBatch(db);
   ids.forEach(id => batch.update(doc(db, 'transactions', id), updates));
   await batch.commit();
-};
-
-// Vincula pagos directos antiguos. Cada par se escribe completo dentro de su
-// lote; Firestore admite 500 escrituras por lote y cada par usa 2.
-export const linkDirectPayments = async (pairs: DirectPaymentPair[]): Promise<void> => {
-  for (let i = 0; i < pairs.length; i += 200) {
-    const batch = writeBatch(db);
-    pairs.slice(i, i + 200).forEach(({ contribution, expense }) => {
-      batch.update(doc(db, 'transactions', expense.id), { linkedTransactionId: contribution.id });
-      batch.update(doc(db, 'transactions', contribution.id), {
-        linkedTransactionId: expense.id,
-        description: `${contribution.description}: ${expense.description}`,
-      });
-    });
-    await batch.commit();
-  }
 };
 
 export const bulkClearActivityFromTransactions = async (ids: string[]): Promise<void> => {
