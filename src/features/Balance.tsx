@@ -10,6 +10,7 @@ import {
 import { cn, formatCurrency } from '../lib/utils';
 import { useModalHistory } from '../hooks/useModalHistory';
 import CommitmentCard from '../components/CommitmentCard';
+import { CashBalanceChart } from '../components/FinanceCharts';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ContributionForm from './ContributionForm';
@@ -213,11 +214,11 @@ export default function Balance() {
             {/* Mini Grid dentro de la tarjeta */}
             <div className="grid grid-cols-2 gap-4 bg-white/10 rounded-2xl p-3 backdrop-blur-sm border border-white/10">
               <div>
-                <p className="text-[10px] uppercase tracking-wider opacity-70">Tu Aporte Total</p>
+                <p className="text-xs uppercase tracking-wider opacity-70">Tu Aporte Total</p>
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.totalContributed)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider opacity-70">
+                <p className="text-xs uppercase tracking-wider opacity-70">
                   Tu parte de lo gastado (1/{memberCount || 4})
                 </p>
                 <p className="font-semibold text-lg">{formatCurrency(currentUserStats.share)}</p>
@@ -344,6 +345,8 @@ export default function Balance() {
           </div>
         </div>
 
+        <CashBalanceChart transactions={transactions} totalInBox={totalInBox} />
+
         {/* --- ARQUEO DE CAJA --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
@@ -359,7 +362,7 @@ export default function Balance() {
             {!isCollaborator && (
               <button
                 onClick={() => { setCountedAmount(''); setShowCashCount(true); }}
-                className="bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform flex-shrink-0"
+                className="min-h-11 bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-transform flex-shrink-0"
               >
                 Contar caja
               </button>
@@ -377,7 +380,7 @@ export default function Balance() {
                 <p className="text-xs font-semibold text-gray-700">
                   {lastCashCount.difference === 0 ? 'La caja cuadró' : `Descuadre: ${formatCurrency(lastCashCount.difference)}`}
                 </p>
-                <p className="text-[11px] text-gray-500 truncate">
+                <p className="text-xs text-gray-500 truncate">
                   {lastCashCount.countedByName} contó {formatCurrency(lastCashCount.countedAmount)} · {format(lastCashCount.createdAt, "d MMM, HH:mm", { locale: es })}
                 </p>
               </div>
@@ -445,7 +448,7 @@ export default function Balance() {
                         {userIsInDebt ? '-' : '+'}{formatCurrency(Math.abs(stats.balance))}
                       </span>
                       <span className={cn(
-                        "text-[11px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
+                        "text-xs px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium",
                         userIsInDebt ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
                       )}>
                         {userIsInDebt ? 'Debe' : 'A favor'}
@@ -508,7 +511,7 @@ export default function Balance() {
                         <span className="text-sm font-bold block text-emerald-600">
                           +{formatCurrency(stats.totalContributed)}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium bg-emerald-50 text-emerald-600">
+                        <span className="text-xs px-1.5 py-0.5 rounded-full inline-block mt-1 font-medium bg-emerald-50 text-emerald-600">
                           Aportado
                         </span>
                       </div>
@@ -531,7 +534,7 @@ export default function Balance() {
             {allUserContributions.length > 0 && (
               <button
                 onClick={() => navigate(`/user/${user.id}/contributions`)}
-                className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 py-1.5"
+                className="min-h-11 flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 py-1.5"
               >
                 Ver todos ({allUserContributions.length}) <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -619,7 +622,7 @@ export default function Balance() {
       {showCashCount && (
         <div role="dialog" aria-modal="true" aria-label="Registrar arqueo de caja" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setShowCashCount(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95dvh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -693,11 +696,11 @@ export default function Balance() {
                       <div key={c.id} className="flex items-center justify-between px-3 py-2.5 bg-white">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-gray-700 truncate">{c.countedByName}</p>
-                          <p className="text-[11px] text-gray-500">{format(c.createdAt, "d MMM yyyy, HH:mm", { locale: es })}</p>
+                          <p className="text-xs text-gray-500">{format(c.createdAt, "d MMM yyyy, HH:mm", { locale: es })}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs font-bold text-gray-800 tabular-nums">{formatCurrency(c.countedAmount)}</p>
-                          <p className={cn('text-[11px] font-semibold', c.difference === 0 ? 'text-emerald-600' : 'text-amber-600')}>
+                          <p className={cn('text-xs font-semibold', c.difference === 0 ? 'text-emerald-600' : 'text-amber-600')}>
                             {c.difference === 0 ? 'Cuadró' : `${c.difference > 0 ? '+' : ''}${formatCurrency(c.difference)}`}
                           </p>
                         </div>

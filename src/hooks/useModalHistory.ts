@@ -11,6 +11,7 @@ let listenerAttached = false;
 // Cuando un modal se cierra con la X/backdrop consumimos su entrada de historial
 // con history.back(); ese popstate es nuestro y NO debe cerrar otro modal.
 let suppressPops = 0;
+let afterSettled: (() => void)[] = [];
 
 function attachListener() {
   if (listenerAttached) return;
@@ -18,6 +19,11 @@ function attachListener() {
   window.addEventListener('popstate', () => {
     if (suppressPops > 0) {
       suppressPops--;
+      if (suppressPops === 0) {
+        const pending = afterSettled;
+        afterSettled = [];
+        pending.forEach((run) => run());
+      }
       return;
     }
     const top = modalStack[modalStack.length - 1];
@@ -27,6 +33,18 @@ function attachListener() {
       top.close();
     }
   });
+}
+
+/**
+ * Abre lo siguiente solo cuando el historial del modal anterior ya se consumió:
+ * un pushState mientras history.back() está pendiente puede cancelar ese retroceso
+ * y dejar el atrás del sistema desfasado.
+ */
+export function runAfterModalClosed(run: () => void) {
+  setTimeout(() => {
+    if (suppressPops > 0) afterSettled.push(run);
+    else run();
+  }, 0);
 }
 
 /**

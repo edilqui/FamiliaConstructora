@@ -6,13 +6,28 @@ import {
   Wallet, TrendingDown, TrendingUp, Scale, Building2, Search,
   ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Minus, PiggyBank,
 } from 'lucide-react';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
-} from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
+import TapChart, {
+  CHART_BLUE, CHART_GRID, CHART_MARGIN, CHART_ORANGE, ChartReadout, xAxisProps, yAxisProps,
+} from '../components/TapChart';
+import { PayablesVsCash } from '../components/FinanceCharts';
 import { format, addMonths, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { buildMaterialHistory, materialKey } from '../lib/materials';
+
+// Línea pequeña del precio por compra, de la más antigua a la última
+function PriceSparkline({ prices }: { prices: number[] }) {
+  const low = Math.min(...prices);
+  const span = Math.max(...prices) - low || 1;
+  const points = prices
+    .map((price, i) => `${(i / (prices.length - 1)) * 100},${26 - ((price - low) / span) * 22}`)
+    .join(' ');
+  return (
+    <svg viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Evolución del precio por compra" className="w-full h-10 mb-2">
+      <polyline points={points} fill="none" stroke={CHART_BLUE} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
 
 export default function AnalysisReport() {
   const { transactions, totalInBox, memberCount } = useDashboardData();
@@ -20,6 +35,7 @@ export default function AnalysisReport() {
 
   const [materialSearch, setMaterialSearch] = useState('');
   const [expandedMaterial, setExpandedMaterial] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(1);
 
   // ══════════ 1. FLUJO DE CAJA PROYECTADO ══════════
   // Promedios de los últimos 90 días: robusto ante meses sueltos atípicos
@@ -33,8 +49,8 @@ export default function AnalysisReport() {
     const monthlyNet = monthlyContribution - monthlySpend;
 
     // Meses de caja: sin más aportes, y al ritmo actual de aportes
-    const runwayNoContrib = monthlySpend > 0 ? totalInBox / monthlySpend : Infinity;
-    const runwayCurrent = monthlyNet < 0 ? totalInBox / -monthlyNet : Infinity;
+    const runwayNoContrib = monthlySpend > 0 ? Math.max(0, totalInBox) / monthlySpend : Infinity;
+    const runwayCurrent = monthlyNet < 0 ? Math.max(0, totalInBox) / -monthlyNet : Infinity;
 
     // Proyección a 6 meses para la gráfica
     const projection = Array.from({ length: 7 }, (_, i) => {
@@ -131,18 +147,18 @@ export default function AnalysisReport() {
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-1.5 mb-1">
               <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-              <span className="text-[11px] font-bold text-gray-500 uppercase">Gasto / mes</span>
+              <span className="text-xs font-bold text-gray-500 uppercase">Gasto / mes</span>
             </div>
             <p className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(cashFlow.monthlySpend)}</p>
-            <p className="text-[11px] text-gray-500">promedio últimos 3 meses</p>
+            <p className="text-xs text-gray-500">promedio últimos 3 meses</p>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-1.5 mb-1">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="text-[11px] font-bold text-gray-500 uppercase">Aportes / mes</span>
+              <span className="text-xs font-bold text-gray-500 uppercase">Aportes / mes</span>
             </div>
             <p className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(cashFlow.monthlyContribution)}</p>
-            <p className="text-[11px] text-gray-500">promedio últimos 3 meses</p>
+            <p className="text-xs text-gray-500">promedio últimos 3 meses</p>
           </div>
         </div>
 
@@ -194,32 +210,30 @@ export default function AnalysisReport() {
         {/* Proyección 6 meses */}
         {cashFlow.monthlySpend > 0 && (
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-gray-800 text-sm">Saldo de caja a 6 meses</h3>
-              <div className="flex items-center gap-3 text-[11px] font-medium text-gray-600">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-blue-500" /> Ritmo actual</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-red-400" /> Sin aportes</span>
-              </div>
-            </div>
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cashFlow.projection} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} dy={8} />
-                  <YAxis tickFormatter={formatShort} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={48} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                    formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name]}
-                    labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
-                  />
-                  <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="Al ritmo actual" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="Sin más aportes" stroke="#f87171" strokeWidth={2} strokeDasharray="5 3" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <h3 className="font-bold text-gray-800 mb-3">Saldo de caja a 6 meses</h3>
+            <ChartReadout
+              period={cashFlow.projection[selectedMonth].month}
+              items={[
+                { name: 'Al ritmo actual', value: formatCurrency(cashFlow.projection[selectedMonth]['Al ritmo actual']), color: CHART_BLUE },
+                { name: 'Sin más aportes', value: formatCurrency(cashFlow.projection[selectedMonth]['Sin más aportes']), color: CHART_ORANGE },
+              ]}
+            />
+            <TapChart labels={cashFlow.projection.map((p) => p.month)} selected={selectedMonth} onSelect={setSelectedMonth}>
+              <LineChart data={cashFlow.projection} margin={CHART_MARGIN}>
+                <CartesianGrid vertical={false} stroke={CHART_GRID} />
+                <XAxis dataKey="month" scale="band" {...xAxisProps} />
+                <YAxis {...yAxisProps} />
+                <ReferenceLine y={0} stroke="#111827" label={{ value: 'Caja en cero', position: 'insideBottomRight', fontSize: 12, fill: '#111827' }} />
+                <Line type="linear" dataKey="Al ritmo actual" stroke={CHART_BLUE} strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="linear" dataKey="Sin más aportes" stroke={CHART_ORANGE} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </TapChart>
           </div>
         )}
+
+        <div className="mt-3">
+          <PayablesVsCash totalInBox={totalInBox} />
+        </div>
       </div>
 
       {/* ══════════ ESTIMADO VS REAL ══════════ */}
@@ -332,7 +346,7 @@ export default function AnalysisReport() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">{m.name}</p>
-                      <p className="text-[11px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         {m.purchases.length} compra{m.purchases.length !== 1 ? 's' : ''} · última {format(m.last.date, 'd MMM yyyy', { locale: es })}
                       </p>
                     </div>
@@ -340,20 +354,21 @@ export default function AnalysisReport() {
                       <p className="text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(m.last.unitPrice)}</p>
                       {hasTrend ? (
                         <p className={cn(
-                          'text-[11px] font-semibold flex items-center justify-end gap-0.5 tabular-nums',
+                          'text-xs font-semibold flex items-center justify-end gap-0.5 tabular-nums',
                           m.changePct > 1 ? 'text-red-600' : m.changePct < -1 ? 'text-emerald-600' : 'text-gray-500'
                         )}>
                           {m.changePct > 1 ? <ArrowUpRight className="w-3 h-3" /> : m.changePct < -1 ? <ArrowDownRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                           {Math.abs(m.changePct).toFixed(0)}% desde la 1ª compra
                         </p>
                       ) : (
-                        <p className="text-[11px] text-gray-500">precio de referencia</p>
+                        <p className="text-xs text-gray-500">precio de referencia</p>
                       )}
                     </div>
                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
                   </button>
                   {isExpanded && (
                     <div className="px-4 pb-3 bg-gray-50/60">
+                      {hasTrend && <PriceSparkline prices={m.purchases.map(p => p.unitPrice)} />}
                       <div className="divide-y divide-gray-100">
                         {[...m.purchases].reverse().map((p, i) => (
                           <div key={i} className="flex justify-between py-2 text-xs text-gray-600 tabular-nums">
@@ -369,7 +384,7 @@ export default function AnalysisReport() {
             })}
           </div>
         )}
-        <p className="text-[11px] text-gray-500 text-center mt-2 px-4">
+        <p className="text-xs text-gray-500 text-center mt-2 px-4">
           Se agrupa por el nombre del gasto: usa el mismo nombre al comprar el mismo material (ej. siempre "Cemento gris").
         </p>
       </div>

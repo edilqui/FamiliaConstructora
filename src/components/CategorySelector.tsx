@@ -159,7 +159,7 @@ export default function CategorySelector({
                 </button>
               )}
             </div>
-            <p className="text-[10px] text-gray-400 mt-2 ml-1">
+            <p className="text-xs text-gray-400 mt-2 ml-1">
               {searchTerm
                 ? `${filteredGroups.reduce((acc, g) => acc + g.items.length, 0)} resultados`
                 : `${totalCategories} categorías disponibles`
@@ -187,7 +187,7 @@ export default function CategorySelector({
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                       {group.group?.name || 'Sin grupo'}
                     </span>
-                    <span className="text-[10px] text-gray-400 ml-auto">
+                    <span className="text-xs text-gray-400 ml-auto">
                       {group.items.length}
                     </span>
                   </div>

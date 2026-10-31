@@ -35,7 +35,7 @@ export default function Toaster() {
             {t.actionLabel && (
               <button
                 onClick={() => { t.onAction?.(); dismiss(t.id); }}
-                className="flex-shrink-0 text-emerald-300 font-bold uppercase text-xs tracking-wide px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+                className="flex-shrink-0 min-h-11 text-emerald-300 font-bold uppercase text-xs tracking-wide px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
               >
                 {t.actionLabel}
               </button>

@@ -93,7 +93,7 @@ export default function ActivityDetail() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
 
       {/* HEADER */}
       <header
@@ -121,7 +121,7 @@ export default function ActivityDetail() {
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
-            <p className="text-[10px] text-gray-400">{activityTransactions.length} gasto{activityTransactions.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-gray-400">{activityTransactions.length} gasto{activityTransactions.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
       </header>
@@ -148,7 +148,7 @@ export default function ActivityDetail() {
           </div>
           <div className="space-y-2.5">
             <div>
-              <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
                 <span>Financiero</span>
                 <span>{financialPct.toFixed(0)}%</span>
               </div>
@@ -160,7 +160,7 @@ export default function ActivityDetail() {
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
                 <span>Físico</span>
                 <span>{activity.progressPercent}%</span>
               </div>
@@ -183,7 +183,7 @@ export default function ActivityDetail() {
               </div>
               <div>
                 <h3 className="font-bold text-gray-800 text-sm">Categorías</h3>
-                <p className="text-[10px] text-gray-400">{categoryData.length} con gastos en esta actividad</p>
+                <p className="text-xs text-gray-400">{categoryData.length} con gastos en esta actividad</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -257,7 +257,7 @@ export default function ActivityDetail() {
                                 {t.categoryName && t.categoryName !== 'N/A' && (
                                   <>
                                     <span className="w-1 h-1 bg-gray-300 rounded-full flex-shrink-0" />
-                                    <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                    <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-xs font-medium">
                                       {t.categoryName}
                                     </span>
                                   </>
@@ -268,7 +268,7 @@ export default function ActivityDetail() {
                               <p className="text-sm font-bold text-gray-900">
                                 -{formatCurrency(t.amount)}
                               </p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">
+                              <p className="text-xs text-gray-400 mt-0.5">
                                 {t.quantity && t.unitPrice
                                   ? `${t.quantity} × ${formatCurrency(t.unitPrice)}`
                                   : format(t.date, 'HH:mm')}
@@ -290,7 +290,7 @@ export default function ActivityDetail() {
       {canEdit && (
         <button
           onClick={() => setShowNewExpense(true)}
-          className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
         >
           <Minus className="w-6 h-6" />
           <span className="font-medium text-sm pr-1">Gasto</span>

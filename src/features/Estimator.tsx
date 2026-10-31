@@ -104,7 +104,7 @@ function EstimateEditor({ estimate, history, activities, canEdit, onClose }: Edi
   return (
     <div role="dialog" aria-modal="true" aria-label="Estimación" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <form onSubmit={handleSave} className="relative bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto p-5 space-y-4">
+      <form onSubmit={handleSave} className="relative bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95dvh] overflow-y-auto p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">{estimate ? 'Estimación' : 'Nueva estimación'}</h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
@@ -154,7 +154,7 @@ function EstimateEditor({ estimate, history, activities, canEdit, onClose }: Edi
                   Sumar
                 </button>
               </div>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
+              <p className="text-xs text-gray-500 leading-relaxed">
                 Las cantidades por {template.unit} son de referencia. Ajústalas con tu maestro según la obra.
               </p>
             </div>
@@ -196,7 +196,7 @@ function EstimateEditor({ estimate, history, activities, canEdit, onClose }: Edi
                       className={inputClass}
                     />
                   </div>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     {item.unitPrice !== null
                       ? 'Precio escrito a mano'
                       : known
@@ -375,7 +375,7 @@ export default function Estimator() {
       {canEdit && (
         <button
           onClick={() => setEditing(null)}
-          className="fixed bottom-20 right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
         >
           <Plus className="w-6 h-6" />
           <span className="font-medium text-sm pr-1">Estimar</span>

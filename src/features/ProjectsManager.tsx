@@ -31,6 +31,7 @@ import type { Project } from '../types';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useModalHistory } from '../hooks/useModalHistory';
+import ActionSheet, { MoreButton } from '../components/ActionSheet';
 
 interface ProjectFormData {
   id?: string;
@@ -142,6 +143,7 @@ export default function ProjectsManager() {
   // Confirmación con modal propio (antes usaba window.confirm nativo)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
+  const [menuProject, setMenuProject] = useState<{ project: Project; canDelete: boolean } | null>(null);
   const handleDelete = (project: Project) => setProjectToDelete(project);
 
   const confirmDelete = async () => {
@@ -172,7 +174,16 @@ export default function ProjectsManager() {
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      <ActionSheet
+        open={menuProject !== null}
+        title={menuProject?.project.name ?? ''}
+        onClose={() => setMenuProject(null)}
+        actions={menuProject ? [
+          { label: 'Editar proyecto', icon: Edit2, onClick: () => handleOpenEditForm(menuProject.project) },
+          ...(menuProject.canDelete ? [{ label: 'Eliminar proyecto', icon: Trash2, danger: true, onClick: () => handleDelete(menuProject.project) }] : []),
+        ] : []}
+      />
 
       {/* --- HEADER STICKY --- */}
       <header
@@ -267,7 +278,7 @@ export default function ProjectsManager() {
                     <div>
                       <h3 className="font-bold text-gray-900 leading-tight">{project.name}</h3>
                       <div className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide mt-1",
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide mt-1",
                         statusStyle.bg, statusStyle.text
                       )}>
                         <StatusIcon className="w-3 h-3" />
@@ -276,23 +287,7 @@ export default function ProjectsManager() {
                     </div>
                   </div>
 
-                  {/* Acciones */}
-                  <div className="flex gap-1">
-                    <button 
-                      onClick={() => handleOpenEditForm(project)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    {canDelete && !loadingStats && (
-                      <button 
-                        onClick={() => handleDelete(project)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  <MoreButton label={`Opciones de ${project.name}`} onClick={() => setMenuProject({ project, canDelete: canDelete && !loadingStats })} />
                 </div>
 
                 {/* Métricas Financieras */}
@@ -319,13 +314,13 @@ export default function ProjectsManager() {
                           style={{ width: `${Math.min(percentSpent, 100)}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] text-gray-400 font-medium uppercase">
+                      <div className="flex justify-between text-xs text-gray-400 font-medium uppercase">
                         <span>{percentSpent.toFixed(0)}% Gastado</span>
                         <span>Presupuesto: {formatCurrency(budget)}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <div className="flex items-center gap-1 text-xs text-gray-400 uppercase font-bold tracking-wider">
                       <TrendingUp className="w-3 h-3" /> Sin límite de presupuesto
                     </div>
                   )}
@@ -351,7 +346,7 @@ export default function ProjectsManager() {
       {/* --- FAB --- */}
       <button
         onClick={handleOpenCreateForm}
-        className="fixed bottom-20 right-6 bg-orange-600 hover:bg-orange-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+        className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-orange-600 hover:bg-orange-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
       >
         <Plus className="w-6 h-6" />
         <span className="font-medium text-sm pr-1">Nuevo</span>
@@ -396,7 +391,7 @@ export default function ProjectsManager() {
                     className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all font-mono"
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1 ml-1">Pon 0 para presupuesto ilimitado</p>
+                <p className="text-xs text-gray-400 mt-1 ml-1">Pon 0 para presupuesto ilimitado</p>
               </div>
 
               <div>
@@ -419,7 +414,7 @@ export default function ProjectsManager() {
                       )}
                     >
                       <opt.icon className="w-5 h-5" />
-                      <span className="text-[10px] font-bold uppercase">{opt.label}</span>
+                      <span className="text-xs font-bold uppercase">{opt.label}</span>
                     </button>
                   ))}
                 </div>

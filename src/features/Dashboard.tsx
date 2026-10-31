@@ -1,76 +1,32 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useConstructionData } from '../hooks/useConstructionData';
-import { formatCurrency, formatShort, cn } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import {
   Plus, Minus, Wallet, Loader2, TrendingUp, TrendingDown,
-  BarChart3, Filter, X, Check, Users,
-  Calendar, ArrowUpRight, ArrowDownRight, Building2, ChevronRight,
-  Tag,
+  BarChart3, Calendar, ArrowUpRight, ArrowDownRight, Building2, ChevronRight,
 } from 'lucide-react';
-import { useModalHistory } from '../hooks/useModalHistory';
 import TransactionForm from './TransactionForm';
 import ContributionForm from './ContributionForm';
 import InitializeDataPanel from '../components/InitializeDataPanel';
 import NotificationButton from '../components/NotificationButton';
+import CommitmentCard from '../components/CommitmentCard';
 import { useAuthStore } from '../store/useAuthStore';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
-  LineChart, Line, Legend,
-} from 'recharts';
-import {
-  format, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval,
-  isWithinInterval, addMonths, startOfMonth, subMonths,
-} from 'date-fns';
+import { format, endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { projects, categories, transactions, totalInBox, userStats, memberStats, collaboratorStats, memberCount, projectStats, loading } = useDashboardData();
+  const { projects, transactions, totalInBox, userStats, projectStats, loading } = useDashboardData();
   const { stages, activities } = useConstructionData();
   const currentUser = useAuthStore((state) => state.user);
 
   // El indicador de "sin conexión" ahora es global (OfflineBanner en Layout)
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showContributionForm, setShowContributionForm] = useState(false);
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
-  const [timePeriod, setTimePeriod] = useState<'weekly' | 'monthly'>('monthly');
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [selectedCategoryProjects, setSelectedCategoryProjects] = useState<string[]>([]);
-  const [categoryTimeRange, setCategoryTimeRange] = useState<'1m' | '3m' | '6m' | '12m' | 'all'>('6m');
-  const [enabledContributorIds, setEnabledContributorIds] = useState<Set<string>>(new Set());
-  const [contributorFilterReady, setContributorFilterReady] = useState(false);
-  const [contributionMonths, setContributionMonths] = useState<6 | 12 | 24>(6);
-
-  // El atrás del sistema cierra los modales de filtros
-  useModalHistory(showCategoryFilter, () => setShowCategoryFilter(false));
-  useModalHistory(showFilterModal, () => setShowFilterModal(false));
-
-  useEffect(() => {
-    if (projects.length > 0 && selectedProjects.length === 0) {
-      setSelectedProjects(projects.map(p => p.id));
-    }
-  }, [projects, selectedProjects.length]);
-
-  useEffect(() => {
-    if (projects.length > 0 && selectedCategoryProjects.length === 0) {
-      setSelectedCategoryProjects(projects.map(p => p.id));
-    }
-  }, [projects, selectedCategoryProjects.length]);
-
-  useEffect(() => {
-    if (!contributorFilterReady && memberStats.length > 0) {
-      setEnabledContributorIds(new Set(memberStats.map(s => s.userId)));
-      setContributorFilterReady(true);
-    }
-  }, [memberStats, contributorFilterReady]);
-
-  const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
-
   // ── Gasto del mes actual y anterior ──────────────────────────────────────
   const now = new Date();
   const currentMonthStart = startOfMonth(now);
@@ -128,151 +84,6 @@ export default function Dashboard() {
     [transactions],
   );
 
-  // ── Gráficos (existentes) ─────────────────────────────────────────────────
-  const filteredExpenses = useMemo(() =>
-    transactions.filter(t => t.type === 'expense' && t.projectId && selectedProjects.includes(t.projectId)),
-    [transactions, selectedProjects],
-  );
-
-  const expenseTrendData = useMemo(() => {
-    if (filteredExpenses.length === 0) return [];
-    const sixMonthsAgo = addMonths(now, -6);
-    const intervals = timePeriod === 'weekly'
-      ? eachWeekOfInterval({ start: sixMonthsAgo, end: now }, { weekStartsOn: 1 })
-      : eachMonthOfInterval({ start: sixMonthsAgo, end: now });
-    return intervals.map(start => {
-      const end = timePeriod === 'weekly' ? endOfWeek(start, { weekStartsOn: 1 }) : endOfMonth(start);
-      const total = filteredExpenses
-        .filter(t => isWithinInterval(t.date, { start, end }))
-        .reduce((s, t) => s + t.amount, 0);
-      return { period: format(start, timePeriod === 'weekly' ? 'dd MMM' : 'MMM', { locale: es }), total };
-      // Se conservan los períodos en cero: omitirlos deformaba la tendencia
-      // (la gráfica saltaba meses sin gasto en silencio)
-    }).slice(-6);
-  }, [filteredExpenses, timePeriod]);
-
-  const allCategoryData = useMemo(() => {
-    const totals = new Map<string, number>();
-    filteredExpenses.forEach(t => {
-      if (t.categoryId) totals.set(t.categoryId, (totals.get(t.categoryId) || 0) + t.amount);
-    });
-    return Array.from(totals.entries())
-      .map(([id, val]) => ({ name: categories.find(c => c.id === id)?.name || 'Sin categoría', value: val }))
-      .sort((a, b) => b.value - a.value);
-  }, [filteredExpenses, categories]);
-
-  const categoryFilteredExpenses = useMemo(() => {
-    let fromDate: Date | null = null;
-    if (categoryTimeRange !== 'all') {
-      const months = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 }[categoryTimeRange];
-      fromDate = subMonths(now, months);
-    }
-    return transactions.filter(t =>
-      t.type === 'expense' &&
-      t.projectId && selectedCategoryProjects.includes(t.projectId) &&
-      (fromDate === null || t.date >= fromDate)
-    );
-  }, [transactions, selectedCategoryProjects, categoryTimeRange]);
-
-  const categoryData = useMemo(() => {
-    const totals = new Map<string, number>();
-    categoryFilteredExpenses.forEach(t => {
-      if (t.categoryId) totals.set(t.categoryId, (totals.get(t.categoryId) || 0) + t.amount);
-    });
-    return Array.from(totals.entries())
-      .map(([id, val]) => ({ name: categories.find(c => c.id === id)?.name || 'Sin categoría', value: val }))
-      .sort((a, b) => b.value - a.value);
-  }, [categoryFilteredExpenses, categories]);
-
-  const memberContributionProgress = useMemo(() => {
-    const effectiveBudgetTotal = projects.reduce((sum, project) => {
-      if (project.budget > 0) return sum + project.budget;
-      return sum + transactions
-        .filter(t => t.type === 'expense' && t.projectId === project.id)
-        .reduce((s, t) => s + t.amount, 0);
-    }, 0);
-    const expectedPerMember = effectiveBudgetTotal / (memberCount || 4);
-    return memberStats.map(stats => {
-      const contributed = stats.totalContributed;
-      const remaining = Math.max(0, expectedPerMember - contributed);
-      const percentage = expectedPerMember > 0 ? (contributed / expectedPerMember) * 100 : 0;
-      return {
-        userId: stats.userId, name: stats.userName, contributed,
-        remaining, expected: expectedPerMember,
-        percentage: Math.min(100, percentage),
-        isCurrentUser: stats.userId === currentUser?.id,
-      };
-    }).sort((a, b) => b.percentage - a.percentage);
-  }, [memberStats, memberCount, projects, transactions, currentUser]);
-
-  const collaboratorContributionProgress = useMemo(() =>
-    collaboratorStats.map(stats => ({
-      userId: stats.userId, name: stats.userName,
-      contributed: stats.totalContributed,
-      isCurrentUser: stats.userId === currentUser?.id,
-    })),
-    [collaboratorStats, currentUser],
-  );
-
-  // ── Aportes mensuales por miembro (últimos 6 meses) ─────────────────────────
-  const contributionLineData = useMemo(() => {
-    const months = Array.from({ length: contributionMonths }, (_, i) => subMonths(now, contributionMonths - 1 - i));
-    const tickFormat = contributionMonths === 6 ? 'MMM' : "MMM yy";
-
-    const allContributors = [
-      ...memberStats.map(s => ({ userId: s.userId, name: s.userName, type: 'member' as const })),
-      ...collaboratorStats.map(s => ({ userId: s.userId, name: s.userName, type: 'collaborator' as const })),
-    ];
-
-    const activeContributors = allContributors.filter(c =>
-      transactions.some(t => t.type === 'contribution' && t.userId === c.userId)
-    );
-
-    const data = months.map(monthDate => {
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-      const entry: Record<string, string | number> = {
-        month: format(monthDate, tickFormat, { locale: es }),
-      };
-      activeContributors.forEach(c => {
-        entry[c.name] = transactions
-          .filter(t =>
-            t.type === 'contribution' &&
-            t.userId === c.userId &&
-            t.date >= monthStart &&
-            t.date <= monthEnd
-          )
-          .reduce((s, t) => s + t.amount, 0);
-      });
-      return entry;
-    });
-
-    const xAxisInterval = contributionMonths === 24 ? 3 : contributionMonths === 12 ? 1 : 0;
-
-    return { data, contributors: activeContributors, xAxisInterval };
-  }, [transactions, memberStats, collaboratorStats, contributionMonths]);
-
-  const toggleContributor = (userId: string) => {
-    setEnabledContributorIds(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-  };
-
-  const toggleProject = (id: string) =>
-    setSelectedProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
-  const toggleAllProjects = () =>
-    setSelectedProjects(selectedProjects.length === projects.length ? [] : projects.map(p => p.id));
-  const hasActiveFilters = selectedProjects.length < projects.length;
-
-  const toggleCategoryProject = (id: string) =>
-    setSelectedCategoryProjects(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
-  const toggleAllCategoryProjects = () =>
-    setSelectedCategoryProjects(selectedCategoryProjects.length === projects.length ? [] : projects.map(p => p.id));
-  const hasCategoryActiveFilters = selectedCategoryProjects.length < projects.length || categoryTimeRange !== '6m';
-
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   if (loading) {
@@ -282,7 +93,7 @@ export default function Dashboard() {
   const myStats = userStats.find(s => s.userId === currentUser?.id);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
 
       {/* HEADER */}
       <header
@@ -371,7 +182,7 @@ export default function Dashboard() {
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider ml-1">Obra en Progreso</h3>
               <button
                 onClick={() => navigate('/obra')}
-                className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
+                className="min-h-11 flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
               >
                 Ver todo <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -397,18 +208,18 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <Building2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-bold text-gray-900 text-sm truncate">{stage.name}</p>
-                          <p className="text-[11px] text-gray-500">{projectName}</p>
+                          <p className="font-bold text-gray-900 text-sm">{stage.name}</p>
+                          <p className="text-xs text-gray-500">{projectName}</p>
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0 ml-2">
                         {activeActs > 0 && (
-                          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                          <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
                             {activeActs} activa{activeActs !== 1 ? 's' : ''}
                           </span>
                         )}
                         {completedActs > 0 && (
-                          <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                          <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                             {completedActs} ✓
                           </span>
                         )}
@@ -438,7 +249,7 @@ export default function Dashboard() {
               {activeStages.length > 2 && (
                 <button
                   onClick={() => navigate('/obra')}
-                  className="w-full text-center text-xs font-semibold text-orange-600 py-2 bg-orange-50 rounded-xl border border-orange-100 hover:border-orange-300 transition-colors"
+                  className="w-full min-h-11 text-center text-xs font-semibold text-orange-600 py-2 bg-orange-50 rounded-xl border border-orange-100 hover:border-orange-300 transition-colors"
                 >
                   +{activeStages.length - 2} etapa{activeStages.length - 2 !== 1 ? 's' : ''} más en progreso
                 </button>
@@ -447,351 +258,25 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── 4. GRÁFICOS ── */}
-        {filteredExpenses.length > 0 ? (
-          <div className="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 animate-in slide-in-from-bottom-4 duration-500">
-
-            {/* Gráfico de Tendencia */}
-            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                    <BarChart3 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-sm">Gráfico de Gastos</h3>
-                    <p className="text-[11px] text-gray-500 font-medium">
-                      {timePeriod === 'weekly' ? 'Últimas 6 semanas' : 'Últimos 6 meses'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowFilterModal(true)}
-                  aria-label="Configurar gráfico de gastos"
-                  className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
-                >
-                  <Filter className="w-4 h-4" />
-                  {hasActiveFilters && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-                  )}
-                </button>
-              </div>
-              <div className="h-56 lg:h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={expenseTrendData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis
-                      dataKey="period"
-                      tick={{ fontSize: 10, fill: '#9ca3af' }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={8}
-                    />
-                    <YAxis
-                      tickFormatter={formatShort}
-                      tick={{ fontSize: 9, fill: '#9ca3af' }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={42}
-                    />
-                    <Tooltip
-                      cursor={{ fill: '#f3f4f6', radius: 8 }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                      formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Total gastado']}
-                      labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
-                    />
-                    <Bar dataKey="total" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={44}>
-                      <LabelList
-                        dataKey="total"
-                        position="top"
-                        formatter={(v: unknown) => formatShort(Number(v))}
-                        style={{ fontSize: '9px', fill: '#6b7280', fontWeight: 700 }}
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Categorías — lista scrollable con barras */}
-            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                    <Tag className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-sm">Categorías</h3>
-                    <p className="text-[10px] text-gray-400">{categoryData.length} con gastos</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowCategoryFilter(true)}
-                  aria-label="Filtrar categorías"
-                  className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors relative"
-                >
-                  <Filter className="w-4 h-4" />
-                  {hasCategoryActiveFilters && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-purple-600 rounded-full ring-2 ring-white" />
-                  )}
-                </button>
-              </div>
-
-              {(() => {
-                const total = categoryFilteredExpenses.reduce((a, b) => a + b.amount, 0);
-                return (
-                  <div className="overflow-y-auto max-h-56 lg:max-h-64 space-y-3 pr-1">
-                    {categoryData.map((entry, index) => {
-                      const pct = total > 0 ? (entry.value / total) * 100 : 0;
-                      const color = COLORS[index % COLORS.length];
-                      return (
-                        <div key={entry.name}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                              <span className="text-gray-700 font-medium truncate">{entry.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                              <span className="text-gray-500">{formatShort(entry.value)}</span>
-                              <span className="font-bold text-gray-800 w-7 text-right">{pct.toFixed(0)}%</span>
-                            </div>
-                          </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-1.5 rounded-full transition-all duration-700"
-                              style={{ width: `${pct}%`, backgroundColor: color }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Progreso de Aportes */}
-            <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm">Progreso de Aportes</h3>
-                  <p className="text-[10px] text-gray-400 font-medium">
-                    Basado en presupuestos ({formatCurrency(
-                      projects.reduce((sum, p) => {
-                        if (p.budget > 0) return sum + p.budget;
-                        return sum + transactions.filter(t => t.type === 'expense' && t.projectId === p.id).reduce((s, t) => s + t.amount, 0);
-                      }, 0)
-                    )}) ÷ {memberCount} miembros
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-                {memberContributionProgress.map((user, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigate(`/user/${user.userId}/contributions`)}
-                    className={cn(
-                      'p-3 rounded-xl border transition-all w-full text-left hover:shadow-md hover:scale-[1.01] active:scale-[0.99]',
-                      user.isCurrentUser ? 'bg-blue-50/50 border-blue-200 hover:border-blue-300' : 'bg-gray-50 border-gray-100 hover:border-gray-200',
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold', user.isCurrentUser ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-700')}>
-                          {user.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className={cn('text-sm font-bold', user.isCurrentUser ? 'text-blue-900' : 'text-gray-800')}>
-                            {user.name} {user.isCurrentUser && '(Tú)'}
-                          </p>
-                          <p className="text-[11px] text-gray-500 tabular-nums">{formatCurrency(user.contributed)} / {formatCurrency(user.expected)}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={cn('text-lg font-bold', user.percentage >= 100 ? 'text-emerald-600' : user.percentage >= 50 ? 'text-blue-600' : 'text-amber-600')}>
-                          {user.percentage.toFixed(0)}%
-                        </p>
-                        {user.remaining > 0 && <p className="text-[11px] text-gray-500 tabular-nums">Falta: {formatCurrency(user.remaining)}</p>}
-                      </div>
-                    </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={cn('h-full transition-all duration-500 rounded-full', user.percentage >= 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : user.percentage >= 50 ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-gradient-to-r from-amber-500 to-amber-600')}
-                        style={{ width: `${Math.min(100, user.percentage)}%` }}
-                      />
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {collaboratorContributionProgress.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-3">Colaboradores</p>
-                  <div className="space-y-2">
-                    {collaboratorContributionProgress.map((user, i) => (
-                      <button
-                        key={i}
-                        onClick={() => navigate(`/user/${user.userId}/contributions`)}
-                        className={cn('p-3 rounded-xl border transition-all w-full text-left hover:shadow-md', user.isCurrentUser ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-100')}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold', user.isCurrentUser ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700')}>
-                              {user.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className={cn('text-sm font-bold', user.isCurrentUser ? 'text-purple-900' : 'text-gray-800')}>
-                                {user.name} {user.isCurrentUser && '(Tú)'}
-                              </p>
-                              <p className="text-[10px] text-purple-500">No participa en división de gastos</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-emerald-600">+{formatCurrency(user.contributed)}</p>
-                            <p className="text-[10px] text-gray-500">Aportado</p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
-                {[['bg-emerald-500', '100%+'], ['bg-blue-500', '50-99%'], ['bg-amber-500', '<50%']].map(([color, label]) => (
-                  <div key={label} className="flex items-center gap-1">
-                    <div className={cn('w-2 h-2 rounded-full', color)} />
-                    <span>{label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Aportes mensuales por miembro ── */}
-            {contributionLineData.contributors.length > 0 && (
-              <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
-                {/* Header */}
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg flex-shrink-0">
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-gray-800 text-sm">Aportes por Miembro</h3>
-                      <p className="text-[10px] text-gray-400 font-medium">Comparativa mensual</p>
-                    </div>
-                  </div>
-                  {/* Selector de rango */}
-                  <div className="flex p-0.5 bg-gray-100 rounded-lg flex-shrink-0">
-                    {([6, 12, 24] as const).map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setContributionMonths(m)}
-                        className={cn(
-                          'px-2.5 py-1 text-xs font-semibold rounded-md transition-all',
-                          contributionMonths === m
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-400 hover:text-gray-600',
-                        )}
-                      >
-                        {m}m
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pills de filtro */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {contributionLineData.contributors.map((c, i) => {
-                    const color = COLORS[i % COLORS.length];
-                    const isEnabled = enabledContributorIds.has(c.userId);
-                    const isCollaborator = c.type === 'collaborator';
-                    return (
-                      <button
-                        key={c.userId}
-                        onClick={() => toggleContributor(c.userId)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all',
-                          isEnabled
-                            ? 'text-white'
-                            : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300',
-                        )}
-                        style={isEnabled ? { backgroundColor: color, borderColor: color } : {}}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: isEnabled ? 'rgba(255,255,255,0.7)' : color }}
-                        />
-                        {c.name}
-                        {isCollaborator && (
-                          <span className={cn(
-                            'text-[9px] px-1 py-0.5 rounded font-bold ml-0.5',
-                            isEnabled ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-500',
-                          )}>
-                            collab
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Gráfico */}
-                <div className="h-52 lg:h-60 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={contributionLineData.data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 10, fill: '#9ca3af' }}
-                        axisLine={false}
-                        tickLine={false}
-                        dy={8}
-                        interval={contributionLineData.xAxisInterval}
-                      />
-                      <YAxis
-                        tickFormatter={formatShort}
-                        tick={{ fontSize: 9, fill: '#9ca3af' }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={42}
-                      />
-                      <Tooltip
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                        formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name]}
-                        labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
-                      />
-                      {contributionLineData.contributors.map((c, i) => {
-                        const color = COLORS[i % COLORS.length];
-                        return (
-                          <Line
-                            key={c.userId}
-                            type="monotone"
-                            dataKey={c.name}
-                            stroke={color}
-                            strokeWidth={2.5}
-                            dot={{ r: 3, fill: color, strokeWidth: 0 }}
-                            activeDot={{ r: 5, strokeWidth: 0 }}
-                            hide={!enabledContributorIds.has(c.userId)}
-                          />
-                        );
-                      })}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center opacity-60">
-            <BarChart3 className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-            <p className="text-sm">No hay datos suficientes para los gráficos</p>
-          </div>
+        {/* ── 4. COMPROMISO Y ACCESO A LOS REPORTES ── */}
+        {myStats && currentUser && (
+          <CommitmentCard
+            userId={currentUser.id}
+            userName={myStats.userName}
+            contributions={transactions.filter(t => t.type === 'contribution' && t.userId === currentUser.id)}
+          />
         )}
+        <button
+          onClick={() => navigate('/balance?tab=statistics')}
+          className="w-full min-h-[56px] bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 text-left active:bg-gray-50"
+        >
+          <BarChart3 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <span className="flex-1 min-w-0">
+            <span className="block font-semibold text-gray-900">Ver gráficas y reportes</span>
+            <span className="block text-xs text-gray-500">Tendencia, aportes, categorías y proyecciones</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+        </button>
 
         {/* ── 5. PROYECTOS ACTIVOS (mejorados) ── */}
         <div>
@@ -810,7 +295,7 @@ export default function Dashboard() {
                   <div className="flex items-start justify-between gap-1 mb-1">
                     <p className="text-sm font-bold text-gray-800 truncate flex-1">{stat.projectName}</p>
                     {overBudget && (
-                      <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded flex-shrink-0">⚠ Excedido</span>
+                      <span className="text-xs font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded flex-shrink-0">⚠ Excedido</span>
                     )}
                   </div>
                   <p className={cn('text-sm font-bold mb-1.5', overBudget ? 'text-red-600' : 'text-blue-600')}>
@@ -824,10 +309,10 @@ export default function Dashboard() {
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <p className="text-[11px] text-gray-500 tabular-nums">{pct.toFixed(0)}% de {formatCurrency(stat.budget)}</p>
+                      <p className="text-xs text-gray-500 tabular-nums">{pct.toFixed(0)}% de {formatCurrency(stat.budget)}</p>
                     </>
                   ) : (
-                    <p className="text-[11px] text-gray-500">{stat.transactionCount} movimientos</p>
+                    <p className="text-xs text-gray-500">{stat.transactionCount} movimientos</p>
                   )}
                 </button>
               );
@@ -843,7 +328,7 @@ export default function Dashboard() {
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider ml-1">Últimos Movimientos</h3>
               <button
                 onClick={() => navigate('/expenses')}
-                className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="min-h-11 flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
               >
                 Ver todos <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -861,11 +346,11 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{t.description}</p>
                       {t.activityName ? (
-                        <p className="text-[10px] text-orange-500 font-medium truncate">
+                        <p className="text-xs text-orange-500 font-medium truncate">
                           {t.stageName} › {t.activityName}
                         </p>
                       ) : (
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-xs text-gray-400">
                           {format(t.date, "dd MMM · HH:mm", { locale: es })}
                         </p>
                       )}
@@ -875,7 +360,7 @@ export default function Dashboard() {
                         {isExpense ? '-' : '+'}{formatCurrency(t.amount)}
                       </span>
                       {t.activityName && (
-                        <p className="text-[10px] text-gray-400">{format(t.date, "dd MMM", { locale: es })}</p>
+                        <p className="text-xs text-gray-400">{format(t.date, "dd MMM", { locale: es })}</p>
                       )}
                     </div>
                   </div>
@@ -888,7 +373,7 @@ export default function Dashboard() {
       </div>
 
       {/* FAB */}
-      <div className="fixed bottom-20 right-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 z-40 flex flex-col items-end gap-3">
         {isFabOpen && (
           <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
             <button onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1 group">
@@ -915,119 +400,6 @@ export default function Dashboard() {
           <Plus className="w-7 h-7" />
         </button>
       </div>
-
-      {/* MODAL FILTRO CATEGORÍAS */}
-      {showCategoryFilter && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowCategoryFilter(false)} />
-          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Filtrar Categorías</h2>
-              <button onClick={() => setShowCategoryFilter(false)} aria-label="Cerrar filtro" className="p-2 rounded-full hover:bg-gray-100">
-                <X className="w-6 h-6 text-gray-400" />
-              </button>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Rango de Tiempo</label>
-                <div className="grid grid-cols-5 gap-1 p-1 bg-gray-100 rounded-xl">
-                  {(['1m', '3m', '6m', '12m', 'all'] as const).map(r => (
-                    <button
-                      key={r}
-                      onClick={() => setCategoryTimeRange(r)}
-                      className={cn(
-                        'py-2 text-xs font-semibold rounded-lg transition-all',
-                        categoryTimeRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                      )}
-                    >
-                      {r === 'all' ? 'Todo' : r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos</label>
-                  <button onClick={toggleAllCategoryProjects} className="text-xs font-medium text-purple-600 py-1.5 px-2 -mr-2 rounded-lg hover:bg-purple-50">
-                    {selectedCategoryProjects.length === projects.length ? 'Quitar todos' : 'Seleccionar todos'}
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {projects.map(p => (
-                    <label
-                      key={p.id}
-                      onClick={() => toggleCategoryProject(p.id)}
-                      className={cn('flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all', selectedCategoryProjects.includes(p.id) ? 'border-purple-500 bg-purple-50/50' : 'border-gray-100 bg-white')}
-                    >
-                      <span className={cn('text-sm font-medium', selectedCategoryProjects.includes(p.id) ? 'text-purple-900' : 'text-gray-600')}>{p.name}</span>
-                      <div className={cn('w-5 h-5 rounded-full flex items-center justify-center border transition-colors', selectedCategoryProjects.includes(p.id) ? 'bg-purple-500 border-purple-500' : 'border-gray-300 bg-white')}>
-                        {selectedCategoryProjects.includes(p.id) && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setShowCategoryFilter(false)} className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl mt-6 active:scale-95 transition-transform">
-              Aplicar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL FILTROS */}
-      {showFilterModal && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setShowFilterModal(false)} />
-          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Configurar Gráfico</h2>
-              <button onClick={() => setShowFilterModal(false)} aria-label="Cerrar configuración" className="p-2 rounded-full hover:bg-gray-100">
-                <X className="w-6 h-6 text-gray-400" />
-              </button>
-            </div>
-            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Período de Tiempo</label>
-                <div className="flex p-1 bg-gray-100 rounded-xl">
-                  {(['weekly', 'monthly'] as const).map(p => (
-                    <button key={p} onClick={() => setTimePeriod(p)} className={cn('flex-1 py-2 text-sm font-medium rounded-lg transition-all', timePeriod === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-                      {p === 'weekly' ? 'Semanal' : 'Mensual'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Proyectos Incluidos</label>
-                  <button onClick={toggleAllProjects} className="text-xs font-medium text-blue-600 py-1.5 px-2 -mr-2 rounded-lg hover:bg-blue-50">
-                    {selectedProjects.length === projects.length ? 'Quitar todos' : 'Seleccionar todos'}
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {projects.map(p => (
-                    <label
-                      key={p.id}
-                      onClick={() => toggleProject(p.id)}
-                      className={cn('flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all', selectedProjects.includes(p.id) ? 'border-blue-500 bg-blue-50/50' : 'border-gray-100 bg-white')}
-                    >
-                      <span className={cn('text-sm font-medium', selectedProjects.includes(p.id) ? 'text-blue-900' : 'text-gray-600')}>{p.name}</span>
-                      <div className={cn('w-5 h-5 rounded-full flex items-center justify-center border transition-colors', selectedProjects.includes(p.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white')}>
-                        {selectedProjects.includes(p.id) && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setShowFilterModal(false)} className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl mt-6 active:scale-95 transition-transform">
-              Aplicar Configuración
-            </button>
-          </div>
-        </div>
-      )}
 
       {showExpenseForm && <TransactionForm onClose={() => setShowExpenseForm(false)} />}
       {showContributionForm && <ContributionForm onClose={() => setShowContributionForm(false)} />}

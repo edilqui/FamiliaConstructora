@@ -213,7 +213,7 @@ export default function Settings() {
                 <h2 className="text-lg font-bold text-white leading-tight truncate">{user.name}</h2>
                 <p className="text-sm text-emerald-100 truncate">{user.email}</p>
                 <div className="mt-1.5">
-                  <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-xs font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
                     {(user as any).role === 'collaborator' ? 'Colaborador' : 'Miembro'}
                   </span>
                 </div>

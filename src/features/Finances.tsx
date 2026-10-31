@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useDashboardData } from '../hooks/useDashboardData';
-import { formatCurrency, formatShort } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 import {
   Loader2, TrendingUp, Briefcase, BarChart3, Tag, Share2, Scale,
 } from 'lucide-react';
@@ -11,46 +11,100 @@ import Balance from './Balance';
 import CategoryReport from './CategoryReport';
 import AnalysisReport from './AnalysisReport';
 import NotificationButton from '../components/NotificationButton';
+import FinanceFilterBar from '../components/FinanceFilterBar';
+import ContributionProgress from '../components/ContributionProgress';
+import { CommitmentGrid } from '../components/FinanceCharts';
+import TapChart, {
+  CHART_BLUE, CHART_GRID, CHART_MARGIN, CHART_ORANGE, ChartReadout, useChartSelection, xAxisProps, yAxisProps,
+} from '../components/TapChart';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+  DEFAULT_PERIOD, FinanceFilter, PERIODS, PeriodId, buildBuckets, isInRange, periodLabel, periodRange,
+} from '../lib/financeFilters';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { format, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 type TabType = 'balance' | 'statistics' | 'categories' | 'analysis';
 
 const TABS: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'balance', label: 'Balance', icon: Scale },
-  { id: 'statistics', label: 'Mensual', icon: BarChart3 },
+  { id: 'statistics', label: 'Tendencia', icon: BarChart3 },
   { id: 'categories', label: 'Categorías', icon: Tag },
   { id: 'analysis', label: 'Análisis', icon: TrendingUp },
 ];
 
 export default function Finances() {
   const {
-    memberStats, projectStats, transactions, totalInBox, totalExpenses, loading,
+    memberStats, collaboratorStats, projects, transactions, totalInBox, loading,
   } = useDashboardData();
   // En la URL para que volver de otra pantalla regrese a la misma pestaña
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id ?? 'balance';
-  const setActiveTab = (tab: TabType) => setSearchParams(tab === 'balance' ? {} : { tab }, { replace: true });
+  const updateParams = (change: (params: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchParams);
+    change(next);
+    setSearchParams(next, { replace: true });
+  };
+  const setActiveTab = (tab: TabType) => updateParams((p) => { if (tab === 'balance') p.delete('tab'); else p.set('tab', tab); });
+
+  // También en la URL: el filtro se conserva al cambiar de pestaña y al volver de otra pantalla
+  const periodParam = searchParams.get('period');
+  const filter: FinanceFilter = {
+    period: PERIODS.some((p) => p.id === periodParam) ? periodParam as PeriodId : DEFAULT_PERIOD,
+    projectId: searchParams.get('project') ?? '',
+    from: searchParams.get('from') ?? '',
+    to: searchParams.get('to') ?? '',
+  };
+  const handleFilterChange = (change: Partial<FinanceFilter>) => updateParams((p) => {
+    const next = { ...filter, ...change };
+    p.set('period', next.period);
+    for (const [key, value] of [['project', next.projectId], ['from', next.from], ['to', next.to]]) {
+      if (value) p.set(key, value); else p.delete(key);
+    }
+  });
+  const range = useMemo(() => periodRange(filter), [filter.period, filter.from, filter.to]);
+  const rangeLabel = periodLabel(filter);
+  const selectedProject = projects.find((p) => p.id === filter.projectId);
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
-  // Aportes vs gastos de los últimos 6 meses (incluye meses en cero)
-  const monthlyData = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
-      const monthDate = subMonths(now, 5 - i);
-      const start = startOfMonth(monthDate);
-      const end = endOfMonth(monthDate);
-      const inMonth = transactions.filter(t => t.date >= start && t.date <= end);
+  const periodTransactions = useMemo(() =>
+    transactions.filter((t) => isInRange(t.date, range)),
+    [transactions, range],
+  );
+  const periodExpenses = useMemo(() =>
+    periodTransactions.filter((t) => t.type === 'expense' && (!filter.projectId || t.projectId === filter.projectId)),
+    [periodTransactions, filter.projectId],
+  );
+
+  // Los aportes van a la caja, no a un proyecto: al filtrar por proyecto solo se comparan gastos
+  const trendData = useMemo(() => {
+    const buckets = buildBuckets(range, periodTransactions.map((t) => t.date));
+    return buckets.map((bucket) => {
+      const within = (t: { date: Date }) => t.date >= bucket.start && t.date <= bucket.end;
       return {
-        month: format(monthDate, 'MMM', { locale: es }),
-        Aportes: inMonth.filter(t => t.type === 'contribution').reduce((s, t) => s + t.amount, 0),
-        Gastos: inMonth.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+        label: bucket.label,
+        Aportes: periodTransactions.filter((t) => t.type === 'contribution' && within(t)).reduce((s, t) => s + t.amount, 0),
+        Gastos: periodExpenses.filter(within).reduce((s, t) => s + t.amount, 0),
       };
     });
-  }, [transactions]);
+  }, [range, periodTransactions, periodExpenses]);
+  const [selectedBucket, setSelectedBucket] = useChartSelection(trendData.length);
+  const bucket = trendData[selectedBucket];
+
+  const periodSpent = periodExpenses.reduce((s, t) => s + t.amount, 0);
+  const periodContributed = periodTransactions.filter((t) => t.type === 'contribution').reduce((s, t) => s + t.amount, 0);
+
+  const projectDistribution = useMemo(() => {
+    const totals = new Map<string, { spent: number; count: number }>();
+    periodExpenses.forEach((t) => {
+      if (!t.projectId) return;
+      const current = totals.get(t.projectId) ?? { spent: 0, count: 0 };
+      totals.set(t.projectId, { spent: current.spent + t.amount, count: current.count + 1 });
+    });
+    return Array.from(totals.entries())
+      .map(([id, total]) => ({ id, name: projects.find((p) => p.id === id)?.name ?? 'Sin proyecto', ...total }))
+      .sort((a, b) => b.spent - a.spent);
+  }, [periodExpenses, projects]);
 
   // Resumen del mes actual, compartible por WhatsApp o el share nativo
   const handleShareSummary = async () => {
@@ -116,7 +170,7 @@ export default function Finances() {
               key={id}
               onClick={() => setActiveTab(id)}
               className={cn(
-                "flex-1 min-w-0 py-3 px-1 text-xs sm:text-sm font-semibold transition-colors relative flex items-center justify-center gap-1 sm:gap-2",
+                "flex-1 min-w-0 min-h-11 py-3 px-1 text-xs sm:text-sm font-semibold transition-colors relative flex items-center justify-center gap-1 sm:gap-2",
                 activeTab === id
                   ? "text-blue-600 bg-blue-50/50"
                   : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
@@ -145,88 +199,88 @@ export default function Finances() {
         {/* Tab: Balance */}
         {!loading && activeTab === 'balance' && <Balance />}
 
-        {/* Tab: Mensual */}
+        {/* Filtro común de Tendencia y Categorías */}
+        {!loading && (activeTab === 'statistics' || activeTab === 'categories') && (
+          <FinanceFilterBar filter={filter} projects={projects} onChange={handleFilterChange} />
+        )}
+
+        {/* Tab: Tendencia */}
         {!loading && activeTab === 'statistics' && (
           <>
-            {/* --- GRÁFICA: APORTES VS GASTOS POR MES --- */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                    <BarChart3 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-sm">Aportes vs Gastos</h3>
-                    <p className="text-[11px] text-gray-500 font-medium">Últimos 6 meses</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-[11px] font-medium text-gray-600">
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Aportes</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400" /> Gastos</span>
-                </div>
-              </div>
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} dy={8} />
-                    <YAxis tickFormatter={formatShort} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={44} />
-                    <Tooltip
-                      cursor={{ fill: '#f3f4f6', radius: 8 }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                      formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name]}
-                      labelStyle={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}
-                    />
-                    <Bar dataKey="Aportes" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                    <Bar dataKey="Gastos" fill="#f87171" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            {/* --- GRÁFICA: APORTES VS GASTOS --- */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800">{selectedProject ? `Gastos de ${selectedProject.name}` : 'Aportes vs Gastos'}</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                {rangeLabel}: {selectedProject ? formatCurrency(periodSpent) : `entraron ${formatCurrency(periodContributed)} y salieron ${formatCurrency(periodSpent)}`}
+              </p>
+              {bucket ? (
+                <>
+                  <ChartReadout
+                    period={bucket.label}
+                    items={[
+                      ...(selectedProject ? [] : [{ name: 'Aportes', value: formatCurrency(bucket.Aportes), color: CHART_BLUE }]),
+                      { name: 'Gastos', value: formatCurrency(bucket.Gastos), color: CHART_ORANGE },
+                    ]}
+                  />
+                  <TapChart labels={trendData.map((d) => d.label)} selected={selectedBucket} onSelect={setSelectedBucket}>
+                    <BarChart data={trendData} margin={CHART_MARGIN} barGap={2}>
+                      <CartesianGrid vertical={false} stroke={CHART_GRID} />
+                      <XAxis dataKey="label" {...xAxisProps} />
+                      <YAxis {...yAxisProps} />
+                      {!selectedProject && <Bar dataKey="Aportes" fill={CHART_BLUE} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />}
+                      <Bar dataKey="Gastos" fill={CHART_ORANGE} radius={[4, 4, 0, 0]} maxBarSize={selectedProject ? 36 : 22} isAnimationActive={false} />
+                    </BarChart>
+                  </TapChart>
+                </>
+              ) : (
+                <p className="text-center text-gray-500 text-sm py-6">Elige un rango de fechas válido.</p>
+              )}
             </div>
 
-            {/* --- GASTOS POR PROYECTO (Con Barras de Progreso) --- */}
-            <div>
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
-                Distribución de Gastos
-              </h2>
+            {/* --- CUMPLIMIENTO Y PROGRESO: no dependen del periodo elegido --- */}
+            <CommitmentGrid
+              people={[...memberStats, ...collaboratorStats]}
+              transactions={transactions}
+            />
+            <ContributionProgress />
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-5">
-                {projectStats.map((stat) => {
-                  const percentage = totalExpenses > 0 ? (stat.totalSpent / totalExpenses) * 100 : 0;
+            {/* --- GASTOS POR PROYECTO --- */}
+            {!selectedProject && (
+              <div>
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4" />
+                  Distribución de Gastos
+                </h2>
 
-                  return (
-                    <div key={stat.projectId}>
-                      <div className="flex justify-between items-end mb-1">
-                        <span className="text-sm font-semibold text-gray-800">{stat.projectName}</span>
-                        <div className="text-right">
-                          <span className="text-sm font-bold text-gray-900">{formatCurrency(stat.totalSpent)}</span>
-                          <span className="text-xs text-gray-400 ml-2">({stat.transactionCount} mov.)</span>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-5">
+                  {projectDistribution.map((stat) => {
+                    const percentage = periodSpent > 0 ? (stat.spent / periodSpent) * 100 : 0;
+                    return (
+                      <div key={stat.id}>
+                        <div className="flex justify-between items-end gap-2 mb-1">
+                          <span className="text-sm font-semibold text-gray-800 min-w-0">{stat.name}</span>
+                          <span className="text-sm font-bold text-gray-900 flex-shrink-0">{formatCurrency(stat.spent)}</span>
                         </div>
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: CHART_BLUE }} />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 text-right">{percentage.toFixed(1)}% · {stat.count} mov.</p>
                       </div>
-
-                      {/* Barra de progreso */}
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-1 text-right">{percentage.toFixed(1)}% del total</p>
-                    </div>
-                  );
-                })}
-                 {projectStats.length === 0 && (
-                    <p className="text-center text-gray-400 text-sm py-2">No hay gastos registrados por proyecto</p>
-                 )}
+                    );
+                  })}
+                  {projectDistribution.length === 0 && (
+                    <p className="text-center text-gray-500 text-sm py-2">No hay gastos en este periodo</p>
+                  )}
+                </div>
               </div>
-            </div>
-
+            )}
           </>
         )}
 
         {/* Tab: Categorías */}
-        {!loading && activeTab === 'categories' && <CategoryReport />}
+        {!loading && activeTab === 'categories' && (
+          <CategoryReport range={range} projectId={filter.projectId} periodLabel={rangeLabel} />
+        )}
 
         {/* Tab: Análisis (flujo de caja, estimado vs real, precios) */}
         {!loading && activeTab === 'analysis' && (

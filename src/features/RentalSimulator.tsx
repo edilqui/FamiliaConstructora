@@ -140,7 +140,7 @@ export default function RentalSimulator() {
               <div>
                 <label className={labelClass}>Costo total de la obra</label>
                 <AmountInput value={form.totalCost} onChange={(v) => setForm({ ...form, totalCost: v })} placeholder="0" aria-label="Costo total" className={inputClass} />
-                <p className="text-[11px] text-gray-500 mt-1 ml-1">
+                <p className="text-xs text-gray-500 mt-1 ml-1">
                   Gastado: {formatCurrency(spent)} · Presupuesto: {formatCurrency(project.budget)}
                 </p>
               </div>
@@ -201,7 +201,7 @@ export default function RentalSimulator() {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-gray-500 leading-relaxed px-1">
+                <p className="text-xs text-gray-500 leading-relaxed px-1">
                   Es una estimación con tus supuestos. No incluye créditos, impuestos sobre la renta, reparaciones grandes ni la valorización del inmueble.
                 </p>
               </>

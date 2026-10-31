@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, HardHat, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
   CheckCircle2, Clock, Circle, X, Loader2, AlertTriangle, TrendingUp,
-  DollarSign, PauseCircle, LayoutList, ArrowLeft, ChevronRight, CalendarDays, BookOpen, Calculator,
+  DollarSign, PauseCircle, LayoutList, ChevronRight, CalendarDays, BookOpen, Calculator, Gauge,
 } from 'lucide-react';
 import { useModalHistory } from '../hooks/useModalHistory';
-import { useSmartBack } from '../hooks/useSmartBack';
 import { useAuthStore } from '../store/useAuthStore';
 import { toast } from '../store/useToastStore';
 import AmountInput from '../components/AmountInput';
 import ScheduleView from '../components/ScheduleView';
+import ActionSheet, { MoreButton } from '../components/ActionSheet';
 import { useConstructionData } from '../hooks/useConstructionData';
 import { useDashboardData } from '../hooks/useDashboardData';
 import {
@@ -20,6 +20,7 @@ import {
   createActivity, updateActivity, deleteActivity, getNextActivityOrder,
 } from '../services/activityService';
 import { formatCurrency, cn } from '../lib/utils';
+import { CHART_BLUE, CHART_ORANGE } from '../components/TapChart';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import type { Stage, Activity, StageStatus, ActivityStatus } from '../types';
 
@@ -44,7 +45,7 @@ function StatusBadge({ status, type }: { status: StageStatus | ActivityStatus; t
     : ACTIVITY_STATUS_CONFIG[status as ActivityStatus];
   const Icon = cfg.Icon;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', cfg.color)}>
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0', cfg.color)}>
       <Icon className="w-3 h-3" />
       {cfg.label}
     </span>
@@ -121,7 +122,12 @@ export default function ConstructionManager() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // El atrás del sistema cierra los modales en lugar de salir de la pantalla
-  const goBack = useSmartBack('/');
+  const [menuStage, setMenuStage] = useState<Stage | null>(null);
+  const [menuActivity, setMenuActivity] = useState<Activity | null>(null);
+  const [progressActivity, setProgressActivity] = useState<Activity | null>(null);
+  const [progressValue, setProgressValue] = useState(0);
+  const [progressSaving, setProgressSaving] = useState(false);
+  useModalHistory(progressActivity !== null, () => setProgressActivity(null));
   useModalHistory(showStageModal, () => setShowStageModal(false));
   useModalHistory(showActivityModal, () => setShowActivityModal(false));
   useModalHistory(deletingStageId !== null, () => setDeletingStageId(null));
@@ -316,6 +322,25 @@ export default function ConstructionManager() {
     }
   };
 
+  const openProgress = (activity: Activity) => {
+    setProgressValue(activity.progressPercent);
+    setProgressActivity(activity);
+  };
+
+  const handleSaveProgress = async () => {
+    if (!progressActivity) return;
+    setProgressSaving(true);
+    try {
+      await updateActivity(progressActivity.id, { progressPercent: progressValue });
+      toast('Avance actualizado');
+      setProgressActivity(null);
+    } catch {
+      toast('No se pudo guardar el avance. Intenta nuevamente.');
+    } finally {
+      setProgressSaving(false);
+    }
+  };
+
   const toggleStage = (id: string) => {
     setExpandedStageIds((prev) => {
       const next = new Set(prev);
@@ -335,68 +360,47 @@ export default function ConstructionManager() {
 
     return (
       <div key={stage.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Stage header */}
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* Stage header: toda la tarjeta abre o cierra las actividades */}
+        <div className="relative">
+          <button
+            onClick={() => toggleStage(stage.id)}
+            aria-expanded={isExpanded}
+            className={cn('w-full p-4 text-left active:bg-gray-50 transition-colors', canEdit && 'pr-14')}
+          >
+            <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-4 h-4 text-orange-600" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-bold text-gray-900 truncate">{stage.name}</h3>
-                <p className="text-xs text-gray-400">
+                <h3 className="font-bold text-gray-900">{stage.name}</h3>
+                <p className="text-xs text-gray-500">
                   {projects.find((p) => p.id === stage.projectId)?.name ?? ''}
                 </p>
               </div>
             </div>
-            <StatusBadge status={stage.status} type="stage" />
-          </div>
-
-          {/* Budget row */}
-          <div className="mt-3 space-y-1.5">
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Presupuesto: <span className="font-semibold text-gray-700">{formatCurrency(stage.estimatedBudget)}</span></span>
-              <span className={cn('font-semibold', overBudget ? 'text-red-600' : nearBudget ? 'text-amber-600' : 'text-gray-700')}>
-                Gastado: {formatCurrency(stageSpent)}
-              </span>
+            <div className="mt-2"><StatusBadge status={stage.status} type="stage" /></div>
+            <div className="mt-3 space-y-1.5">
+              <div className="flex flex-wrap justify-between gap-x-3 text-xs text-gray-600">
+                <span>Presupuesto: <span className="font-semibold text-gray-800">{formatCurrency(stage.estimatedBudget)}</span></span>
+                <span className={cn('font-semibold', overBudget ? 'text-red-600' : nearBudget ? 'text-amber-700' : 'text-gray-800')}>
+                  Gastado: {formatCurrency(stageSpent)}
+                </span>
+              </div>
+              <ProgressBar value={stageSpent} max={stage.estimatedBudget} color={nearBudget ? 'bg-amber-500' : 'bg-orange-500'} />
+              <div className={cn('text-right text-xs', overBudget ? 'text-red-600 font-semibold' : nearBudget ? 'text-amber-700 font-semibold' : 'text-gray-500')}>
+                {stage.estimatedBudget > 0
+                  ? `${Math.round((stageSpent / stage.estimatedBudget) * 100)}% del presupuesto${overBudget ? ' · excedido' : nearBudget ? ' · cerca del límite' : ''}`
+                  : 'Sin presupuesto definido'}
+              </div>
             </div>
-            <ProgressBar value={stageSpent} max={stage.estimatedBudget} color={nearBudget ? 'bg-amber-500' : 'bg-orange-500'} />
-            <div className={cn('text-right text-xs', overBudget ? 'text-red-600 font-semibold' : nearBudget ? 'text-amber-600 font-semibold' : 'text-gray-500')}>
-              {stage.estimatedBudget > 0
-                ? `${Math.round((stageSpent / stage.estimatedBudget) * 100)}% del presupuesto${overBudget ? ' · excedido' : nearBudget ? ' · cerca del límite' : ''}`
-                : 'Sin presupuesto definido'}
-            </div>
-          </div>
-
-          {/* Actions row */}
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              onClick={() => toggleStage(stage.id)}
-              className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors py-2.5 pr-2"
-            >
+            <div className="mt-2 flex items-center gap-1 text-sm font-medium text-gray-600">
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               {stageActivities.length} actividad{stageActivities.length !== 1 ? 'es' : ''}
-            </button>
-            <div className="flex-1" />
-            {canEdit && (
-              <>
-                <button
-                  onClick={() => openEditStage(stage)}
-                  aria-label={`Editar etapa ${stage.name}`}
-                  className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-[18px] h-[18px]" />
-                </button>
-                <button
-                  onClick={() => { setDeletingStageId(stage.id); setDeleteError(''); }}
-                  aria-label={`Eliminar etapa ${stage.name}`}
-                  className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-[18px] h-[18px]" />
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          </button>
+          {canEdit && (
+            <MoreButton label={`Opciones de la etapa ${stage.name}`} onClick={() => setMenuStage(stage)} className="absolute top-2 right-2" />
+          )}
         </div>
 
         {/* Activities (expanded) */}
@@ -413,7 +417,7 @@ export default function ConstructionManager() {
               <div className="p-3">
                 <button
                   onClick={() => openNewActivity(stage.id)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors"
+                  className="w-full min-h-11 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Nueva Actividad
@@ -431,57 +435,28 @@ export default function ConstructionManager() {
     const overBudget = activity.estimatedBudget > 0 && spent > activity.estimatedBudget;
 
     return (
-      <div key={activity.id} className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          {/* Área clickeable → navega al detalle */}
-          <button
-            onClick={() => navigate(`/activity/${activity.id}`)}
-            className="flex items-center gap-2 flex-1 min-w-0 text-left hover:opacity-75 transition-opacity active:opacity-60"
-          >
-            <HardHat className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-800 truncate">{activity.name}</span>
+      <div key={activity.id} className="flex items-start">
+        <button
+          onClick={() => navigate(`/activity/${activity.id}`)}
+          className="flex-1 min-w-0 pl-4 pr-1 py-3 text-left active:bg-gray-50 transition-colors"
+        >
+          <span className="flex items-center gap-1 text-sm font-semibold text-gray-800">
+            <span className="min-w-0">{activity.name}</span>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          </button>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
             <StatusBadge status={activity.status} type="activity" />
-            {canEdit && (
-              <>
-                <button
-                  onClick={() => openEditActivity(activity)}
-                  aria-label={`Editar actividad ${activity.name}`}
-                  className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-[18px] h-[18px]" />
-                </button>
-                <button
-                  onClick={() => { setDeletingActivityId(activity.id); setDeleteError(''); }}
-                  aria-label={`Eliminar actividad ${activity.name}`}
-                  className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-[18px] h-[18px]" />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="mt-2 space-y-1.5 ml-5">
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>{formatCurrency(activity.estimatedBudget)} est.</span>
-            <span className={cn('font-medium', overBudget ? 'text-red-600' : 'text-gray-600')}>
-              {formatCurrency(spent)} gastado{overBudget && ' ⚠'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <div className="text-[10px] text-gray-400 mb-0.5">Financiero</div>
-              <ProgressBar value={spent} max={activity.estimatedBudget} />
-            </div>
-            <div className="flex-1">
-              <div className="text-[10px] text-gray-400 mb-0.5">Físico {activity.progressPercent}%</div>
-              <ProgressBar value={activity.progressPercent} max={100} color="bg-blue-500" />
-            </div>
-          </div>
-        </div>
+            Físico {activity.progressPercent}%
+          </span>
+          <span className="mt-2 flex justify-between gap-2 text-xs text-gray-600">
+            <span>Gastado {formatCurrency(spent)}</span>
+            <span className={cn(overBudget && 'text-red-600 font-semibold')}>de {formatCurrency(activity.estimatedBudget)}{overBudget && ' ⚠'}</span>
+          </span>
+          <span className="mt-1 block"><ProgressBar value={spent} max={activity.estimatedBudget} /></span>
+        </button>
+        {canEdit && (
+          <MoreButton label={`Opciones de la actividad ${activity.name}`} onClick={() => setMenuActivity(activity)} className="mt-1 mr-1" />
+        )}
       </div>
     );
   };
@@ -497,6 +472,22 @@ export default function ConstructionManager() {
     const avgPhysical = allActivities.length > 0
       ? Math.round(allActivities.reduce((s, a) => s + a.progressPercent, 0) / allActivities.length)
       : 0;
+    const spendVsProgress = filteredStages
+      .filter((stage) => stage.estimatedBudget > 0 && stage.status !== 'completed')
+      .map((stage) => {
+        const stageActivities = activities.filter((a) => a.stageId === stage.id);
+        const weight = stageActivities.reduce((s, a) => s + (a.estimatedBudget || 0), 0);
+        const physical = stageActivities.length === 0 ? 0 : Math.round(weight > 0
+          ? stageActivities.reduce((s, a) => s + a.progressPercent * (a.estimatedBudget || 0), 0) / weight
+          : stageActivities.reduce((s, a) => s + a.progressPercent, 0) / stageActivities.length);
+        return {
+          id: stage.id,
+          name: stage.name,
+          physical,
+          spentPct: Math.round(((spentByStage.get(stage.id) ?? 0) / stage.estimatedBudget) * 100),
+        };
+      })
+      .sort((a, b) => (b.spentPct - b.physical) - (a.spentPct - a.physical));
 
     return (
       <div className="space-y-4">
@@ -551,6 +542,38 @@ export default function ConstructionManager() {
           </div>
         </div>
 
+        {/* Gasto contra avance físico: el avance pesa según el presupuesto de cada actividad */}
+        {spendVsProgress.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <h3 className="font-bold text-gray-800">¿Gastamos más de lo que avanzamos?</h3>
+            <p className="text-xs text-gray-500 mb-1">Comparación por etapa con presupuesto, sin las completadas.</p>
+            <div className="flex gap-4 text-xs text-gray-600 mb-3">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full" style={{ backgroundColor: CHART_ORANGE }} /> Gasto</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full" style={{ backgroundColor: CHART_BLUE }} /> Avance físico</span>
+            </div>
+            <div className="space-y-4">
+              {spendVsProgress.map((row) => (
+                <div key={row.id}>
+                  <div className="flex justify-between gap-2 text-sm mb-1">
+                    <span className="font-medium text-gray-800 min-w-0">{row.name}</span>
+                    <span className="text-xs text-gray-600 flex-shrink-0 tabular-nums">{row.spentPct}% · {row.physical}%</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(100, row.spentPct)}%`, backgroundColor: CHART_ORANGE }} /></div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${row.physical}%`, backgroundColor: CHART_BLUE }} /></div>
+                  </div>
+                  {row.spentPct - row.physical >= 15 && (
+                    <p className="flex items-center gap-1 text-xs font-semibold text-red-700 mt-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Gasto {row.spentPct - row.physical} puntos por encima del avance
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-3">El avance físico es el que se registra a mano en cada actividad.</p>
+          </div>
+        )}
+
         {/* Per-stage breakdown */}
         {filteredStages.map((stage) => {
           const stageActivities = activities.filter((a) => a.stageId === stage.id);
@@ -573,7 +596,7 @@ export default function ConstructionManager() {
                   <div>
                     <div className="text-gray-400 mb-1">Financiero</div>
                     <ProgressBar value={stageSpent} max={stage.estimatedBudget} />
-                    <div className="flex justify-between text-gray-500 mt-1">
+                    <div className="flex flex-wrap justify-between gap-x-1 text-gray-500 mt-1">
                       <span>{formatCurrency(stageSpent)}</span>
                       <span>de {formatCurrency(stage.estimatedBudget)}</span>
                     </div>
@@ -599,14 +622,14 @@ export default function ConstructionManager() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <ProgressBar value={spent} max={activity.estimatedBudget} />
-                        <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5">
                           <span>{formatCurrency(spent)}</span>
                           <span>{formatCurrency(activity.estimatedBudget)}</span>
                         </div>
                       </div>
                       <div>
                         <ProgressBar value={activity.progressPercent} max={100} color="bg-blue-400" />
-                        <div className="text-[10px] text-gray-400 mt-0.5 text-right">{activity.progressPercent}% físico</div>
+                        <div className="text-xs text-gray-400 mt-0.5 text-right">{activity.progressPercent}% físico</div>
                       </div>
                     </div>
                   </div>
@@ -624,7 +647,7 @@ export default function ConstructionManager() {
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
 
       {/* Header */}
       <header
@@ -637,42 +660,10 @@ export default function ConstructionManager() {
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
-            <button
-              onClick={goBack}
-              aria-label="Volver"
-              className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
             <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
-            <h1 className="text-lg font-bold text-gray-900">Avance de Obra</h1>
-          </div>
-          <div className="flex items-center gap-1">
-          <button
-            onClick={() => navigate('/obra/estimador')}
-            aria-label="Estimador de costos"
-            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <Calculator className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => navigate('/obra/bitacora')}
-            aria-label="Bitácora de obra"
-            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <BookOpen className="w-5 h-5" />
-          </button>
-          {activeTab === 'gestion' && canEdit && (
-            <button
-              onClick={openNewStage}
-              className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-3 py-2 rounded-xl transition-colors active:scale-95 shadow-sm shadow-orange-200"
-            >
-              <Plus className="w-4 h-4" />
-              Nueva Etapa
-            </button>
-          )}
+            <h1 className="text-lg font-bold text-gray-900">Obra</h1>
           </div>
         </div>
       </header>
@@ -685,7 +676,7 @@ export default function ConstructionManager() {
           <button
             onClick={() => setActiveTab('gestion')}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
+              'flex-1 min-h-11 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
               activeTab === 'gestion' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
@@ -695,7 +686,7 @@ export default function ConstructionManager() {
           <button
             onClick={() => setActiveTab('progreso')}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
+              'flex-1 min-h-11 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
               activeTab === 'progreso' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
@@ -705,7 +696,7 @@ export default function ConstructionManager() {
           <button
             onClick={() => setActiveTab('cronograma')}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
+              'flex-1 min-h-11 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold rounded-xl transition-all',
               activeTab === 'cronograma' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
@@ -714,12 +705,22 @@ export default function ConstructionManager() {
           </button>
         </div>
 
+        {/* Herramientas de la obra */}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => navigate('/obra/estimador')} className="min-h-11 flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 active:bg-gray-50">
+            <Calculator className="w-4 h-4" /> Estimador
+          </button>
+          <button onClick={() => navigate('/obra/bitacora')} className="min-h-11 flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 active:bg-gray-50">
+            <BookOpen className="w-4 h-4" /> Bitácora
+          </button>
+        </div>
+
         {/* Project filter */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <button
             onClick={() => setSelectedProjectId('')}
             className={cn(
-              'flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors',
+              'flex-shrink-0 min-h-11 px-3.5 rounded-xl text-sm font-semibold transition-colors',
               !selectedProjectId ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-orange-300',
             )}
           >
@@ -730,7 +731,7 @@ export default function ConstructionManager() {
               key={p.id}
               onClick={() => setSelectedProjectId(p.id)}
               className={cn(
-                'flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors',
+                'flex-shrink-0 min-h-11 px-3.5 rounded-xl text-sm font-semibold transition-colors',
                 selectedProjectId === p.id ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-orange-300',
               )}
             >
@@ -757,7 +758,7 @@ export default function ConstructionManager() {
                 {canEdit && (
                   <>
                     <p className="text-sm text-gray-400">Crea la primera etapa de tu obra.</p>
-                    <button onClick={openNewStage} className="inline-flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-semibold text-sm">
+                    <button onClick={openNewStage} className="inline-flex min-h-11 items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-semibold text-sm">
                       <Plus className="w-4 h-4" /> Nueva Etapa
                     </button>
                   </>
@@ -772,11 +773,73 @@ export default function ConstructionManager() {
         )}
       </div>
 
+      {activeTab === 'gestion' && canEdit && (
+        <button
+          onClick={openNewStage}
+          aria-label="Nueva etapa"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-transform z-40"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
+
+      <ActionSheet
+        open={menuStage !== null}
+        title={menuStage?.name ?? ''}
+        onClose={() => setMenuStage(null)}
+        actions={menuStage ? [
+          { label: 'Nueva actividad', icon: Plus, onClick: () => { setExpandedStageIds((prev) => new Set(prev).add(menuStage.id)); openNewActivity(menuStage.id); } },
+          { label: 'Editar etapa', icon: Edit2, onClick: () => openEditStage(menuStage) },
+          { label: 'Eliminar etapa', icon: Trash2, danger: true, onClick: () => { setDeletingStageId(menuStage.id); setDeleteError(''); } },
+        ] : []}
+      />
+      <ActionSheet
+        open={menuActivity !== null}
+        title={menuActivity?.name ?? ''}
+        onClose={() => setMenuActivity(null)}
+        actions={menuActivity ? [
+          { label: 'Actualizar avance', icon: Gauge, onClick: () => openProgress(menuActivity) },
+          { label: 'Editar actividad', icon: Edit2, onClick: () => openEditActivity(menuActivity) },
+          { label: 'Eliminar actividad', icon: Trash2, danger: true, onClick: () => { setDeletingActivityId(menuActivity.id); setDeleteError(''); } },
+        ] : []}
+      />
+
+      {/* ── Avance físico ── */}
+      {progressActivity && (
+        <div role="dialog" aria-modal="true" aria-label="Actualizar avance" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setProgressActivity(null)} />
+          <div className="relative bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-10 duration-200">
+            <p className="text-sm font-bold text-gray-500 truncate">{progressActivity.name}</p>
+            <p className="text-4xl font-bold text-gray-900 my-2 tabular-nums">{progressValue}%</p>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={progressValue}
+              onChange={(e) => setProgressValue(Number(e.target.value))}
+              aria-label="Avance físico"
+              className="w-full h-11 accent-orange-500"
+            />
+            <div className="grid grid-cols-5 gap-1.5 mb-4">
+              {[0, 25, 50, 75, 100].map((value) => (
+                <button key={value} onClick={() => setProgressValue(value)} className={cn('min-h-11 rounded-lg text-sm font-semibold', progressValue === value ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700')}>
+                  {value}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleSaveProgress} disabled={progressSaving} className="w-full min-h-[52px] bg-orange-500 text-white rounded-xl font-bold disabled:opacity-50">
+              {progressSaving ? 'Guardando…' : 'Guardar avance'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Stage Modal ── */}
       {showStageModal && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowStageModal(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-3xl">
               <h2 className="text-lg font-bold text-gray-900">{editingStage ? 'Editar Etapa' : 'Nueva Etapa'}</h2>
@@ -858,7 +921,7 @@ export default function ConstructionManager() {
       {showActivityModal && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowActivityModal(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-3xl">
               <h2 className="text-lg font-bold text-gray-900">{editingActivity ? 'Editar Actividad' : 'Nueva Actividad'}</h2>

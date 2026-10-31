@@ -241,7 +241,7 @@ export default function Payables() {
                   key={value}
                   onClick={() => setTab(value)}
                   className={cn(
-                    'flex-1 py-2 text-sm font-semibold rounded-xl transition-all',
+                    'flex-1 min-h-11 py-2 text-sm font-semibold rounded-xl transition-all',
                     tab === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500',
                   )}
                 >
@@ -281,7 +281,7 @@ export default function Payables() {
                             <>
                               <button
                                 onClick={() => setPaying(p)}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors"
+                                className="flex-1 min-h-11 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors"
                               >
                                 <CheckCircle2 className="w-4 h-4" /> Registrar pago
                               </button>
@@ -314,7 +314,7 @@ export default function Payables() {
       {canEdit && (
         <button
           onClick={openNew}
-          className="fixed bottom-20 right-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
         >
           <Plus className="w-6 h-6" />
           <span className="font-medium text-sm pr-1">Cuenta</span>
@@ -324,7 +324,7 @@ export default function Payables() {
       {showForm && (
         <div role="dialog" aria-modal="true" aria-label="Cuenta por pagar" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <form onSubmit={handleSave} className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto p-6 space-y-4">
+          <form onSubmit={handleSave} className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95dvh] overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">{editing ? 'Editar cuenta' : 'Nueva cuenta'}</h2>
               <button type="button" onClick={() => setShowForm(false)} aria-label="Cerrar" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">

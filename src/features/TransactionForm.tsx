@@ -346,7 +346,7 @@ export default function TransactionForm({ onClose, defaultProjectId, transaction
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
       {/* Modal Content */}
-      <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+      <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95dvh] overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
         
         {/* Drag Handle (Mobile only visual cue) */}
         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />

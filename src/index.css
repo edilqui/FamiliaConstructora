@@ -10,3 +10,33 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Celular: los iconos sueltos miden al menos 44 px y siempre se ve la respuesta al toque.
+   :where no suma especificidad, así las clases de cada botón siguen mandando. */
+:where(button[aria-label], a[aria-label]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+button, a, label {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled), a:active {
+  opacity: 0.75;
+}
+
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select) {
+  min-height: 44px;
+}
+
+/* Safari acerca la pantalla al enfocar campos con letra menor de 16 px */
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}

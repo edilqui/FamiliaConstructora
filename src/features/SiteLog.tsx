@@ -62,7 +62,7 @@ function NewEntryForm({ onClose }: { onClose: () => void }) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Nueva anotación" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <form onSubmit={handleSubmit} className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95vh] overflow-y-auto p-6 space-y-4">
+      <form onSubmit={handleSubmit} className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[95dvh] overflow-y-auto p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Nueva anotación</h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
@@ -238,7 +238,7 @@ export default function SiteLog() {
       {canEdit && (
         <button
           onClick={() => setShowForm(true)}
-          className="fixed bottom-20 right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
         >
           <Plus className="w-6 h-6" />
           <span className="font-medium text-sm pr-1">Anotar</span>

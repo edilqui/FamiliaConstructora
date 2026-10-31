@@ -129,7 +129,7 @@ export default function AuditLog() {
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-0.5 break-words">{entry.summary}</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{format(entry.createdAt, 'd MMM yyyy • HH:mm', { locale: es })}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{format(entry.createdAt, 'd MMM yyyy • HH:mm', { locale: es })}</p>
                   {entry.changes.length > 0 && (
                     <ul className="mt-2 bg-gray-50 rounded-lg p-2.5 space-y-1">
                       {entry.changes.map((change) => (

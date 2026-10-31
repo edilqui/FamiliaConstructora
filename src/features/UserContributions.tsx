@@ -246,7 +246,7 @@ export default function UserContributions() {
             {/* Mini stats - diferentes para colaboradores */}
             {isCollaborator ? (
               <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-                <p className="text-[10px] uppercase tracking-wider opacity-70">Estado</p>
+                <p className="text-xs uppercase tracking-wider opacity-70">Estado</p>
                 <p className="font-semibold">No participa en división de gastos</p>
                 <p className="text-xs opacity-70 mt-1">
                   Los aportes de colaboradores van directamente a la caja común
@@ -256,11 +256,11 @@ export default function UserContributions() {
               <>
                 <div className="grid grid-cols-2 gap-3 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider opacity-70">Meta esperada</p>
+                    <p className="text-xs uppercase tracking-wider opacity-70">Meta esperada</p>
                     <p className="font-semibold">{formatCurrency(expectedContribution)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider opacity-70">Progreso</p>
+                    <p className="text-xs uppercase tracking-wider opacity-70">Progreso</p>
                     <p className="font-semibold">{progressPercentage.toFixed(0)}%</p>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export default function UserContributions() {
                 <button
                   onClick={handleExport}
                   disabled={filteredContributions.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 flex-shrink-0"
+                  className="min-h-11 flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" /> Exportar CSV
                 </button>
@@ -401,7 +401,7 @@ export default function UserContributions() {
                         <span className="font-bold text-emerald-600 text-sm lg:text-base">
                           +{formatCurrency(contribution.amount)}
                         </span>
-                        <p className="text-[11px] mt-0.5 text-gray-500 tabular-nums">
+                        <p className="text-xs mt-0.5 text-gray-500 tabular-nums">
                           Acum.: {formatCurrency(runningTotals.get(contribution.id) ?? 0)}
                         </p>
                       </div>

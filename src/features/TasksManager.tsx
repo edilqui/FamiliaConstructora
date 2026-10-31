@@ -15,6 +15,7 @@ import {
   Pencil,
   Calendar
 } from 'lucide-react';
+import ActionSheet, { MoreButton } from '../components/ActionSheet';
 import type { Task } from '../types';
 import { cn } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
@@ -72,6 +73,7 @@ export default function TasksManager() {
 
   // Estado para confirmación de eliminación
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [menuTask, setMenuTask] = useState<{ task: Task; isCompleted: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // El atrás del sistema cierra los modales en lugar de salir de la pantalla
@@ -204,32 +206,11 @@ export default function TasksManager() {
             {task.title}
           </p>
 
-          {/* Botones de acción - siempre visibles en móvil, hover en desktop */}
-          <div className="flex items-center gap-1">
-            {/* Botón Editar */}
-            {!isCompleted && (
-              <button
-                onClick={() => startEditing(task)}
-                className="flex-shrink-0 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                aria-label="Editar tarea"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Botón Eliminar */}
-            <button
-              onClick={() => setTaskToDelete(task)}
-              className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-              aria-label="Eliminar tarea"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          <MoreButton label={`Opciones de la tarea ${task.title}`} onClick={() => setMenuTask({ task, isCompleted })} />
         </div>
 
         {/* Creador de la tarea - dato secundario sutil */}
-        <div className="ml-10 flex items-center gap-1.5 text-[11px] text-gray-400">
+        <div className="ml-10 flex items-center gap-1.5 text-xs text-gray-400">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300"></span>
           <span>{task.createdByName}</span>
         </div>
@@ -241,6 +222,15 @@ export default function TasksManager() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+      <ActionSheet
+        open={menuTask !== null}
+        title={menuTask?.task.title ?? ''}
+        onClose={() => setMenuTask(null)}
+        actions={menuTask ? [
+          ...(menuTask.isCompleted ? [] : [{ label: 'Editar tarea', icon: Pencil, onClick: () => startEditing(menuTask.task) }]),
+          { label: 'Eliminar tarea', icon: Trash2, danger: true, onClick: () => setTaskToDelete(menuTask.task) },
+        ] : []}
+      />
 
       {/* --- HEADER STICKY --- */}
       <header
@@ -391,7 +381,7 @@ export default function TasksManager() {
           />
 
           {/* Modal */}
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
             {/* Handle para móvil */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-300 rounded-full" />
@@ -447,7 +437,7 @@ export default function TasksManager() {
           />
 
           {/* Modal */}
-          <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 duration-200">
             {/* Handle para móvil */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-300 rounded-full" />

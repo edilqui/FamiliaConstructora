@@ -30,6 +30,7 @@ import type { Category } from '../types';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useModalHistory } from '../hooks/useModalHistory';
+import ActionSheet, { MoreButton } from '../components/ActionSheet';
 
 interface CategoryFormData {
   id?: string;
@@ -210,6 +211,7 @@ export default function CategoriesManager() {
   // Confirmación con modal propio (antes usaba window.confirm nativo)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
+  const [menuCategory, setMenuCategory] = useState<{ category: Category; canDelete: boolean } | null>(null);
   const handleDelete = (category: Category) => setCategoryToDelete(category);
 
   const confirmDelete = async () => {
@@ -230,7 +232,16 @@ export default function CategoriesManager() {
   const { hidden: headerHidden, spacerHeight, headerRef } = useScrollAwareHeader();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+      <ActionSheet
+        open={menuCategory !== null}
+        title={menuCategory?.category.name ?? ''}
+        onClose={() => setMenuCategory(null)}
+        actions={menuCategory ? [
+          { label: 'Editar categoría', icon: Edit2, onClick: () => handleOpenEditForm(menuCategory.category) },
+          ...(menuCategory.canDelete ? [{ label: 'Eliminar categoría', icon: Trash2, danger: true, onClick: () => handleDelete(menuCategory.category) }] : []),
+        ] : []}
+      />
 
       {/* --- HEADER STICKY CON BUSCADOR --- */}
       <header
@@ -310,14 +321,15 @@ export default function CategoriesManager() {
                   <div className="flex items-center gap-2">
                     <FolderOpen className="w-4 h-4 text-purple-600" />
                     <span className="text-sm font-bold text-gray-700">{groupData.group.name}</span>
-                    <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Grupo</span>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Grupo</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEditForm(groupData.group!)}
-                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      aria-label={`Editar grupo ${groupData.group!.name}`}
+                      className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-[18px] h-[18px]" />
                     </button>
                   </div>
                 </div>
@@ -335,7 +347,7 @@ export default function CategoriesManager() {
                         <div className="flex items-center gap-3 overflow-hidden">
                           {/* Icono / Orden */}
                           <div className="w-10 h-10 rounded-xl bg-purple-50 flex flex-col items-center justify-center flex-shrink-0 text-purple-600 border border-purple-100">
-                            <span className="text-[10px] font-bold">#{category.order}</span>
+                            <span className="text-xs font-bold">#{category.order}</span>
                           </div>
 
                           <div className="min-w-0">
@@ -347,7 +359,7 @@ export default function CategoriesManager() {
                                 <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
                               ) : (
                                 <span className={cn(
-                                  "text-[10px] px-1.5 py-0.5 rounded-md font-medium flex items-center gap-1",
+                                  "text-xs px-1.5 py-0.5 rounded-md font-medium flex items-center gap-1",
                                   usageCount > 0 ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-400"
                                 )}>
                                   <Activity className="w-3 h-3" />
@@ -358,24 +370,7 @@ export default function CategoriesManager() {
                           </div>
                         </div>
 
-                        {/* Acciones */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleOpenEditForm(category)}
-                            className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-
-                          {canDelete && !loadingUsage && (
-                            <button
-                              onClick={() => handleDelete(category)}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                        <MoreButton label={`Opciones de ${category.name}`} onClick={() => setMenuCategory({ category, canDelete: canDelete && !loadingUsage })} />
                       </div>
                     );
                   })}
@@ -401,11 +396,11 @@ export default function CategoriesManager() {
       </div>
 
       {/* --- FAB CON MENÚ EXPANDIBLE --- */}
-      <div className="fixed bottom-20 right-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 z-40 flex flex-col items-end gap-3">
         <div className="flex flex-col gap-2">
           <button
             onClick={() => handleOpenCreateForm('group')}
-            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-900 rounded-full pl-4 pr-3 py-2.5 shadow-lg border border-gray-200 active:scale-95 transition-all"
+            className="min-h-11 flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-900 rounded-full pl-4 pr-3 py-2.5 shadow-lg border border-gray-200 active:scale-95 transition-all"
           >
             <FolderOpen className="w-4 h-4" />
             <span className="font-medium text-sm">Nuevo Grupo</span>
@@ -413,7 +408,7 @@ export default function CategoriesManager() {
 
           <button
             onClick={() => handleOpenCreateForm('category')}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white rounded-full pl-4 pr-3 py-2.5 shadow-xl active:scale-95 transition-all"
+            className="min-h-11 flex items-center gap-2 bg-gray-900 hover:bg-black text-white rounded-full pl-4 pr-3 py-2.5 shadow-xl active:scale-95 transition-all"
           >
             <Tag className="w-4 h-4" />
             <span className="font-medium text-sm">Nueva Categoría</span>
@@ -433,7 +428,7 @@ export default function CategoriesManager() {
                   ? (formType === 'group' ? 'Editar Grupo' : 'Editar Categoría')
                   : (formType === 'group' ? 'Nuevo Grupo' : 'Nueva Categoría')}
               </h2>
-              <button onClick={handleCloseForm} className="p-1 rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
+              <button onClick={handleCloseForm} aria-label="Cerrar" className="p-1 rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

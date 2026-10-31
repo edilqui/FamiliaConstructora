@@ -29,6 +29,7 @@ import {
   Heart,
   Crown
 } from 'lucide-react';
+import ActionSheet, { MoreButton } from '../components/ActionSheet';
 import { cn, formatCurrency } from '../lib/utils';
 import { useScrollAwareHeader } from '../hooks/useScrollAwareHeader';
 import { format } from 'date-fns';
@@ -47,6 +48,7 @@ interface UserData {
 }
 
 export default function UserApprovalManager() {
+  const [menuUser, setMenuUser] = useState<{ id: string; name: string; nextRole: 'member' | 'collaborator'; canDelete: boolean } | null>(null);
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
   const { transactions } = useDashboardData();
@@ -232,14 +234,14 @@ export default function UserApprovalManager() {
   const getRoleBadge = (role: UserRole) => {
     if (role === 'member') {
       return (
-        <div className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[10px] font-medium px-2 py-1 rounded-full">
+        <div className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">
           <Crown className="w-3 h-3" />
           Miembro
         </div>
       );
     }
     return (
-      <div className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-[10px] font-medium px-2 py-1 rounded-full">
+      <div className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs font-medium px-2 py-1 rounded-full">
         <Heart className="w-3 h-3" />
         Colaborador
       </div>
@@ -250,6 +252,15 @@ export default function UserApprovalManager() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+      <ActionSheet
+        open={menuUser !== null}
+        title={menuUser?.name ?? ''}
+        onClose={() => setMenuUser(null)}
+        actions={menuUser ? [
+          { label: menuUser.nextRole === 'member' ? 'Cambiar a miembro' : 'Cambiar a colaborador', icon: UserCog, disabled: processingId === menuUser.id, onClick: () => handleChangeRole(menuUser.id, menuUser.nextRole) },
+          { label: 'Eliminar usuario', icon: Trash2, danger: true, disabled: !menuUser.canDelete, hint: menuUser.canDelete ? undefined : 'No se puede: tiene movimientos', onClick: () => setShowRemoveUserConfirm(menuUser.id) },
+        ] : []}
+      />
 
       {/* --- HEADER STICKY --- */}
       <header
@@ -459,7 +470,7 @@ export default function UserApprovalManager() {
               <h2 className="text-xs font-bold text-blue-600 uppercase tracking-wider">
                 Miembros ({memberUsers.length})
               </h2>
-              <span className="text-[10px] text-gray-400 ml-1">• Dividen gastos equitativamente</span>
+              <span className="text-xs text-gray-400 ml-1">• Dividen gastos equitativamente</span>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -493,7 +504,7 @@ export default function UserApprovalManager() {
                         </p>
                         <p className="text-xs text-gray-400 truncate">{user.email}</p>
                         {txInfo.total > 0 && (
-                          <p className="text-[10px] text-gray-400 mt-1">
+                          <p className="text-xs text-gray-400 mt-1">
                             {txInfo.total} transacciones • Aportes: {formatCurrency(txInfo.contributions)}
                           </p>
                         )}
@@ -503,29 +514,7 @@ export default function UserApprovalManager() {
                         {getRoleBadge(user.role)}
 
                         {!isCurrentUser && (
-                          <>
-                            <button
-                              onClick={() => handleChangeRole(user.id, 'collaborator')}
-                              disabled={processingId === user.id}
-                              className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                              title="Cambiar a Colaborador"
-                            >
-                              <UserCog className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
-                              disabled={!canDelete}
-                              className={cn(
-                                "p-2 rounded-lg transition-colors",
-                                canDelete
-                                  ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                  : "text-gray-300 cursor-not-allowed"
-                              )}
-                              title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+                          <MoreButton label={`Opciones de ${user.name}`} onClick={() => setMenuUser({ id: user.id, name: user.name, nextRole: 'collaborator', canDelete })} />
                         )}
                       </div>
                     </div>
@@ -536,7 +525,7 @@ export default function UserApprovalManager() {
                           <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                           <div>
                             <p className="text-xs text-red-700 font-medium">¿Eliminar a {user.name}?</p>
-                            <p className="text-[10px] text-red-600 mt-1">
+                            <p className="text-xs text-red-600 mt-1">
                               Este usuario no tiene transacciones registradas.
                             </p>
                           </div>
@@ -565,7 +554,7 @@ export default function UserApprovalManager() {
                     )}
 
                     {!isCurrentUser && !canDelete && (
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-2 ml-13">
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-2 ml-13">
                         <XCircle className="w-3 h-3" />
                         No eliminable: tiene {txInfo.total} transacciones
                       </p>
@@ -585,7 +574,7 @@ export default function UserApprovalManager() {
               <h2 className="text-xs font-bold text-purple-600 uppercase tracking-wider">
                 Colaboradores ({collaboratorUsers.length})
               </h2>
-              <span className="text-[10px] text-gray-400 ml-1">• Solo aportan, sin cuota</span>
+              <span className="text-xs text-gray-400 ml-1">• Solo aportan, sin cuota</span>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -613,7 +602,7 @@ export default function UserApprovalManager() {
                         </p>
                         <p className="text-xs text-gray-400 truncate">{user.email}</p>
                         {txInfo.contributions > 0 && (
-                          <p className="text-[10px] text-purple-500 mt-1">
+                          <p className="text-xs text-purple-500 mt-1">
                             Ha aportado: {formatCurrency(txInfo.contributions)}
                           </p>
                         )}
@@ -623,29 +612,7 @@ export default function UserApprovalManager() {
                         {getRoleBadge(user.role)}
 
                         {!isCurrentUser && (
-                          <>
-                            <button
-                              onClick={() => handleChangeRole(user.id, 'member')}
-                              disabled={processingId === user.id}
-                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Cambiar a Miembro"
-                            >
-                              <UserCog className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => canDelete ? setShowRemoveUserConfirm(user.id) : null}
-                              disabled={!canDelete}
-                              className={cn(
-                                "p-2 rounded-lg transition-colors",
-                                canDelete
-                                  ? "text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                  : "text-gray-300 cursor-not-allowed"
-                              )}
-                              title={canDelete ? "Eliminar usuario" : "No se puede eliminar: tiene transacciones"}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+                          <MoreButton label={`Opciones de ${user.name}`} onClick={() => setMenuUser({ id: user.id, name: user.name, nextRole: 'member', canDelete })} />
                         )}
                       </div>
                     </div>
@@ -656,7 +623,7 @@ export default function UserApprovalManager() {
                           <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                           <div>
                             <p className="text-xs text-red-700 font-medium">¿Eliminar a {user.name}?</p>
-                            <p className="text-[10px] text-red-600 mt-1">
+                            <p className="text-xs text-red-600 mt-1">
                               Este usuario no tiene transacciones registradas.
                             </p>
                           </div>
@@ -685,7 +652,7 @@ export default function UserApprovalManager() {
                     )}
 
                     {!isCurrentUser && !canDelete && (
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-2 ml-13">
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-2 ml-13">
                         <XCircle className="w-3 h-3" />
                         No eliminable: tiene {txInfo.total} transacciones
                       </p>

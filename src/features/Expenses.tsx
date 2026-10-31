@@ -55,6 +55,7 @@ export default function Expenses() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  useModalHistory(showFilters, () => setShowFilters(false));
 
   // ── Selección múltiple ──────────────────────────────────────────────────────
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -261,7 +262,7 @@ export default function Expenses() {
   const headerHidden = !isSelectionMode && hidden;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
 
       {/* HEADER */}
       <header
@@ -291,13 +292,14 @@ export default function Expenses() {
             </div>
             <button
               onClick={allVisibleSelected ? () => setSelectedIds(new Set()) : selectAll}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
+              className="min-h-11 text-sm font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
             >
               {allVisibleSelected ? 'Ninguno' : 'Todos'}
             </button>
             <button
               onClick={() => { setBulkAction('menu'); setBulkError(''); }}
               disabled={selectedIds.size === 0}
+              aria-label="Acciones para lo seleccionado"
               className="p-2 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-30 flex-shrink-0"
             >
               <MoreVertical className="w-5 h-5 text-gray-700" />
@@ -327,6 +329,7 @@ export default function Expenses() {
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
+                    aria-label="Borrar búsqueda"
                     className="p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
                   >
                     <X className="w-4 h-4 text-gray-500" />
@@ -360,65 +363,6 @@ export default function Expenses() {
                 </button>
               </div>
             )}
-            {showFilters && !showSearch && (
-              <div className="mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2 fade-in duration-200">
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="all">Todos los tipos</option>
-                    <option value="contribution">Solo Aportes</option>
-                    <option value="expense">Solo Gastos</option>
-                  </select>
-                  <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="all">Todos los proy.</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                {filterType !== 'contribution' && (
-                  <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="all">Todas las categorías</option>
-                    {groupedCategories.map((group, idx) =>
-                      group.group
-                        ? <optgroup key={group.group.id} label={group.group.name}>{group.items.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
-                        : <optgroup key={`orphan-${idx}`} label="Sin grupo">{group.items.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
-                    )}
-                  </select>
-                )}
-                {/* Rango de fechas */}
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 block mb-1 ml-1">Desde</label>
-                    <input
-                      type="date"
-                      value={filterDateFrom}
-                      max={filterDateTo || undefined}
-                      onChange={e => setFilterDateFrom(e.target.value)}
-                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 block mb-1 ml-1">Hasta</label>
-                    <input
-                      type="date"
-                      value={filterDateTo}
-                      min={filterDateFrom || undefined}
-                      onChange={e => setFilterDateTo(e.target.value)}
-                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={handleExportCsv}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg mb-1 hover:bg-emerald-100 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> Exportar a Excel (CSV) · {filteredTransactions.length} mov.
-                </button>
-                {hasActiveFilters && (
-                  <button onClick={() => { setFilterType('all'); setFilterProject('all'); setFilterCategory('all'); setSearchTerm(''); setFilterDateFrom(''); setFilterDateTo(''); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg mt-1">
-                    <Trash2 className="w-3 h-3" /> Limpiar todo
-                  </button>
-                )}
-              </div>
-            )}
           </>
         )}
       </header>
@@ -444,7 +388,7 @@ export default function Expenses() {
 
         {/* HINT de selección (solo aparece cuando hay items) */}
         {!isSelectionMode && filteredTransactions.length > 0 && (
-          <p className="text-[10px] text-gray-400 text-center mb-3 select-none">
+          <p className="text-xs text-gray-400 text-center mb-3 select-none">
             Mantén presionado un movimiento para seleccionarlo
           </p>
         )}
@@ -540,7 +484,7 @@ export default function Expenses() {
                                   {isExpense && t.categoryName !== 'N/A' && (
                                     <>
                                       <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                                      <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] font-medium">{t.categoryName}</span>
+                                      <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-xs font-medium">{t.categoryName}</span>
                                     </>
                                   )}
                                 </div>
@@ -567,12 +511,12 @@ export default function Expenses() {
                                 {(() => {
                                   const boxAfter = runningBalanceById.get(t.id);
                                   return boxAfter !== undefined ? (
-                                    <p className="text-[11px] mt-0.5 text-gray-500 tabular-nums">
+                                    <p className="text-xs mt-0.5 text-gray-500 tabular-nums">
                                       Caja: <span className={cn('font-semibold', boxAfter < 0 ? 'text-red-600' : 'text-gray-700')}>{formatCurrency(boxAfter)}</span>
                                     </p>
                                   ) : null;
                                 })()}
-                                <p className="text-[10px] text-gray-400 mt-0.5 lg:hidden">
+                                <p className="text-xs text-gray-400 mt-0.5 lg:hidden">
                                   {t.quantity && t.unitPrice
                                     ? <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
                                     : format(t.date, 'HH:mm')}
@@ -592,7 +536,7 @@ export default function Expenses() {
 
       {/* FAB */}
       {!isSelectionMode && (
-        <div className="fixed bottom-20 right-6 z-40 flex flex-col items-end gap-3">
+        <div className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 z-40 flex flex-col items-end gap-3">
           {isFabOpen && (
             <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200 mb-1">
               <button onClick={() => { setShowContributionForm(true); setIsFabOpen(false); }} className="flex items-center gap-3 pr-1">
@@ -616,11 +560,76 @@ export default function Expenses() {
         </div>
       )}
 
+      {showFilters && (
+        <div role="dialog" aria-modal="true" aria-label="Filtrar movimientos" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowFilters(false)} />
+              <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] max-h-[calc(100dvh-3rem)] overflow-y-auto animate-in slide-in-from-bottom-10 duration-200">
+<h2 className="text-lg font-bold text-gray-900 mb-3">Filtrar movimientos</h2>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="all">Todos los tipos</option>
+                    <option value="contribution">Solo Aportes</option>
+                    <option value="expense">Solo Gastos</option>
+                  </select>
+                  <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="all">Todos los proy.</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                {filterType !== 'contribution' && (
+                  <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="all">Todas las categorías</option>
+                    {groupedCategories.map((group, idx) =>
+                      group.group
+                        ? <optgroup key={group.group.id} label={group.group.name}>{group.items.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
+                        : <optgroup key={`orphan-${idx}`} label="Sin grupo">{group.items.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
+                    )}
+                  </select>
+                )}
+                {/* Rango de fechas */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 block mb-1 ml-1">Desde</label>
+                    <input
+                      type="date"
+                      value={filterDateFrom}
+                      max={filterDateTo || undefined}
+                      onChange={e => setFilterDateFrom(e.target.value)}
+                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 block mb-1 ml-1">Hasta</label>
+                    <input
+                      type="date"
+                      value={filterDateTo}
+                      min={filterDateFrom || undefined}
+                      onChange={e => setFilterDateTo(e.target.value)}
+                      className="w-full bg-gray-50 text-sm border border-gray-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleExportCsv}
+                  className="w-full min-h-11 flex items-center justify-center gap-1.5 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 rounded-lg mb-1 hover:bg-emerald-100 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Exportar a Excel (CSV) · {filteredTransactions.length} mov.
+                </button>
+                {hasActiveFilters && (
+                  <button onClick={() => { setFilterType('all'); setFilterProject('all'); setFilterCategory('all'); setSearchTerm(''); setFilterDateFrom(''); setFilterDateTo(''); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg mt-1">
+                    <Trash2 className="w-3 h-3" /> Limpiar todo
+                  </button>
+                )}
+              <button onClick={() => setShowFilters(false)} className="w-full min-h-[52px] mt-2 bg-gray-900 text-white rounded-xl font-bold">Ver {filteredTransactions.length} movimientos</button>
+</div>
+        </div>
+      )}
+
       {/* ── MENÚ BULK (bottom sheet) ── */}
       {bulkAction === 'menu' && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('none')} />
-          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
+          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1" />
             <p className="px-5 pt-3 pb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
               Acciones en lote · {selectedIds.size} transacciones
@@ -664,7 +673,7 @@ export default function Expenses() {
       {bulkAction === 'category' && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('menu')} />
-          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
+          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />
             <div className="px-5 pb-5">
               <div className="flex items-center gap-3 mb-5">
@@ -714,7 +723,7 @@ export default function Expenses() {
       {bulkAction === 'activity' && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBulkAction('menu')} />
-          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100vh-5rem)] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
+          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90dvh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300">
             <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />
             <div className="px-5 pb-5">
               <div className="flex items-center gap-3 mb-5">

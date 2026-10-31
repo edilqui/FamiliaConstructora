@@ -138,7 +138,7 @@ export default function ProjectExpenses() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
 
       {/* --- HEADER STICKY --- */}
       <header
@@ -242,7 +242,7 @@ export default function ProjectExpenses() {
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Gastado</p>
             <p className="text-3xl font-bold text-gray-900 tracking-tight">{formatCurrency(totalSpent)}</p>
             <div className="flex items-center gap-2 mt-2">
-               <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+               <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">
                  {projectTransactions.length} movimientos
                </span>
             </div>
@@ -308,11 +308,11 @@ export default function ProjectExpenses() {
                             {/* Info adicional solo en móvil */}
                             <div className="flex items-center gap-2 mt-0.5 lg:hidden">
                               {t.categoryName !== 'N/A' && (
-                                <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium truncate">
+                                <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium truncate">
                                   {t.categoryName}
                                 </span>
                               )}
-                              <span className="text-[10px] text-gray-400">
+                              <span className="text-xs text-gray-400">
                                 {t.quantity && t.unitPrice ? (
                                   <span>{t.quantity} × {formatCurrency(t.unitPrice)}</span>
                                 ) : (
@@ -361,7 +361,7 @@ export default function ProjectExpenses() {
       {!collaborator && (
         <button
           onClick={() => setShowExpenseForm(true)}
-          className="fixed bottom-20 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
+          className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all z-40 flex items-center gap-2"
         >
           <Minus className="w-6 h-6" />
           <span className="font-medium text-sm pr-1">Gasto</span>
